@@ -36,8 +36,24 @@ const TAAM_REPLACEMENTS: Array<{ name: string; unicodeMark: string; tier: Tier }
   { name: "SOF_PASUK", unicodeMark: "׃", tier: "PISUQ" },
 ];
 
-function tokenText(token: Token): string {
-  return token.letters.map((l) => `${l.baseChar}${l.niqqud.join("")}`).join("");
+function tokenTextWithTaamim(token: Token, tokenTaamim: GeneratedTaam[]): string {
+  const marksByLetter = new Map<number, string[]>();
+  for (const taam of tokenTaamim) {
+    const letterMarks = marksByLetter.get(taam.position.letterIndex) ?? [];
+    letterMarks.push(taam.unicodeMark);
+    marksByLetter.set(taam.position.letterIndex, letterMarks);
+  }
+
+  return token.letters
+    .map((letter, letterIndex) => {
+      const taamMarks = marksByLetter.get(letterIndex) ?? [];
+      return `${letter.baseChar}${letter.niqqud.join("")}${taamMarks.join("")}`;
+    })
+    .join("");
+}
+
+function versePath(verseId: string, suffix = ""): string {
+  return `/api/verse/${encodeURIComponent(verseId)}${suffix}`;
 }
 
 export default function HomePage() {
@@ -47,6 +63,15 @@ export default function HomePage() {
   const [selectedTaamId, setSelectedTaamId] = useState<string | null>(null);
   const [activeToken, setActiveToken] = useState<number>(0);
   const [notes, setNotes] = useState("");
+  const [importMode, setImportMode] = useState<"single" | "chapter">("single");
+  const [importTarget, setImportTarget] = useState<"hebrew" | "targum" | "both">("both");
+  const [singleVerseId, setSingleVerseId] = useState("");
+  const [singleHebrew, setSingleHebrew] = useState("");
+  const [singleTargum, setSingleTargum] = useState("");
+  const [chapterHebrewFile, setChapterHebrewFile] = useState<File | null>(null);
+  const [chapterTargumFile, setChapterTargumFile] = useState<File | null>(null);
+  const [importBusy, setImportBusy] = useState(false);
+  const [importMessage, setImportMessage] = useState("");
 
   const selectedTaam = useMemo(() => record?.edited.find((t) => t.taamId === selectedTaamId) ?? null, [record, selectedTaamId]);
   const lowConfidence = useMemo(
@@ -64,8 +89,92 @@ export default function HomePage() {
     }
   }
 
+  async function postImport(url: string, content: string): Promise<number> {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content }),
+    });
+    const json = (await res.json()) as { imported?: number; error?: string };
+    if (!res.ok) {
+      throw new Error(json.error ?? `Import failed: ${url}`);
+    }
+    return json.imported ?? 0;
+  }
+
+  function firstVerseIdFromTsv(content: string): string | null {
+    const line = content
+      .split(/\r?\n/)
+      .map((row) => row.trim())
+      .find(Boolean);
+    if (!line) return null;
+    const [id] = line.split("\t");
+    return id?.trim() || null;
+  }
+
+  async function runImport() {
+    setImportMessage("");
+    setImportBusy(true);
+    try {
+      let firstVerse: string | null = null;
+      let imported = 0;
+
+      if (importMode === "single") {
+        const normalizedId = singleVerseId.trim();
+        if (!normalizedId) {
+          throw new Error("Verse ID is required (example: Genesis:1:1)");
+        }
+        if (!/^[^:\s]+:\d+:\d+$/.test(normalizedId)) {
+          throw new Error("Verse ID must match Book:Chapter:Verse (example: Genesis:1:1).");
+        }
+
+        const hebrewLine = `${normalizedId}\t${singleHebrew.trim()}`;
+        const targumLine = `${normalizedId}\t${singleTargum.trim()}`;
+
+        if (importTarget !== "targum" && singleHebrew.trim()) {
+          imported += await postImport("/api/import/hebrew", hebrewLine);
+          firstVerse = normalizedId;
+        }
+        if (importTarget !== "hebrew" && singleTargum.trim()) {
+          imported += await postImport("/api/import/targum", targumLine);
+          firstVerse = normalizedId;
+        }
+        if (imported === 0) {
+          throw new Error("Add text for the selected import target.");
+        }
+      } else {
+        if (importTarget !== "targum") {
+          if (!chapterHebrewFile) {
+            throw new Error("Select a Hebrew TSV file.");
+          }
+          const content = await chapterHebrewFile.text();
+          imported += await postImport("/api/import/hebrew", content);
+          firstVerse = firstVerseIdFromTsv(content);
+        }
+        if (importTarget !== "hebrew") {
+          if (!chapterTargumFile) {
+            throw new Error("Select a Targum TSV file.");
+          }
+          const content = await chapterTargumFile.text();
+          imported += await postImport("/api/import/targum", content);
+          firstVerse = firstVerse ?? firstVerseIdFromTsv(content);
+        }
+      }
+
+      await refreshVerses();
+      if (firstVerse) {
+        setVerseId(firstVerse);
+      }
+      setImportMessage(`Imported ${imported} record(s).`);
+    } catch (error) {
+      setImportMessage(error instanceof Error ? error.message : "Import failed.");
+    } finally {
+      setImportBusy(false);
+    }
+  }
+
   async function loadVerse(id: string) {
-    const res = await fetch(`/api/verse/${id}`);
+    const res = await fetch(versePath(id));
     if (!res.ok) return;
     const json = (await res.json()) as VerseRecord;
     setRecord(json);
@@ -75,7 +184,7 @@ export default function HomePage() {
 
   async function postPatch(op: unknown, note?: string) {
     if (!record) return;
-    await fetch(`/api/verse/${record.verse.id}/patch`, {
+    await fetch(versePath(record.verse.id, "/patch"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ op, note }),
@@ -140,28 +249,28 @@ export default function HomePage() {
 
   async function runTranspose() {
     if (!verseId) return;
-    await fetch(`/api/transpose/${verseId}`, { method: "POST" });
+    await fetch(`/api/transpose/${encodeURIComponent(verseId)}`, { method: "POST" });
     await loadVerse(verseId);
     await refreshVerses();
   }
 
   async function undo() {
     if (!record) return;
-    await fetch(`/api/verse/${record.verse.id}/undo`, { method: "POST" });
+    await fetch(versePath(record.verse.id, "/undo"), { method: "POST" });
     await loadVerse(record.verse.id);
     await refreshVerses();
   }
 
   async function redo() {
     if (!record) return;
-    await fetch(`/api/verse/${record.verse.id}/redo`, { method: "POST" });
+    await fetch(versePath(record.verse.id, "/redo"), { method: "POST" });
     await loadVerse(record.verse.id);
     await refreshVerses();
   }
 
   async function saveVerification(verified: boolean) {
     if (!record) return;
-    await fetch(`/api/verse/${record.verse.id}/verify`, {
+    await fetch(versePath(record.verse.id, "/verify"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ verified, manuscriptNotes: notes }),
@@ -228,6 +337,62 @@ export default function HomePage() {
   return (
     <main>
       <section className="panel">
+        <h3>Import</h3>
+        <div className="row">
+          <button className={importMode === "single" ? "primary" : ""} onClick={() => setImportMode("single")}>Single passuk</button>
+          <button className={importMode === "chapter" ? "primary" : ""} onClick={() => setImportMode("chapter")}>Chapter TSV</button>
+        </div>
+        <div style={{ marginTop: 8 }}>
+          <label className="small">Target</label>
+          <select value={importTarget} onChange={(e) => setImportTarget(e.target.value as "hebrew" | "targum" | "both")}>
+            <option value="both">Hebrew + Targum</option>
+            <option value="hebrew">Hebrew only</option>
+            <option value="targum">Targum only</option>
+          </select>
+        </div>
+
+        {importMode === "single" ? (
+          <>
+            <label className="small" style={{ marginTop: 8 }}>Verse ID</label>
+            <input value={singleVerseId} onChange={(e) => setSingleVerseId(e.target.value)} placeholder="Genesis:1:1" />
+            {importTarget !== "targum" ? (
+              <>
+                <label className="small" style={{ marginTop: 8 }}>Hebrew text</label>
+                <textarea value={singleHebrew} onChange={(e) => setSingleHebrew(e.target.value)} />
+              </>
+            ) : null}
+            {importTarget !== "hebrew" ? (
+              <>
+                <label className="small" style={{ marginTop: 8 }}>Targum text</label>
+                <textarea value={singleTargum} onChange={(e) => setSingleTargum(e.target.value)} />
+              </>
+            ) : null}
+          </>
+        ) : (
+          <>
+            {importTarget !== "targum" ? (
+              <>
+                <label className="small" style={{ marginTop: 8 }}>Hebrew TSV</label>
+                <input type="file" accept=".tsv,text/tab-separated-values,text/plain" onChange={(e) => setChapterHebrewFile(e.target.files?.[0] ?? null)} />
+              </>
+            ) : null}
+            {importTarget !== "hebrew" ? (
+              <>
+                <label className="small" style={{ marginTop: 8 }}>Targum TSV</label>
+                <input type="file" accept=".tsv,text/tab-separated-values,text/plain" onChange={(e) => setChapterTargumFile(e.target.files?.[0] ?? null)} />
+              </>
+            ) : null}
+          </>
+        )}
+
+        <div className="row" style={{ marginTop: 8 }}>
+          <button className="primary" onClick={runImport} disabled={importBusy}>
+            {importBusy ? "Importing..." : "Import"}
+          </button>
+        </div>
+        {importMessage ? <div className="small" style={{ marginTop: 6 }}>{importMessage}</div> : null}
+
+        <hr />
         <h3>Verse Navigator</h3>
         <div className="small">Low-confidence first</div>
         {verseItems
@@ -262,17 +427,17 @@ export default function HomePage() {
 
         <h4>Aramaic (editable ta’amim layer)</h4>
         <div className="row aramaic">
-          {record?.verse.aramaicTokens.map((token, tokenIndex) => (
-            <div
-              key={`${token.surface}-${tokenIndex}`}
-              className={`token ${activeToken === tokenIndex ? "active" : ""}`}
-              onClick={() => setActiveToken(tokenIndex)}
-            >
-              <div>{tokenText(token)}</div>
-              <div>
-                {record.edited
-                  .filter((t) => t.position.tokenIndex === tokenIndex)
-                  .map((t) => (
+          {record?.verse.aramaicTokens.map((token, tokenIndex) => {
+            const tokenTaamim = record.edited.filter((t) => t.position.tokenIndex === tokenIndex);
+            return (
+              <div
+                key={`${token.surface}-${tokenIndex}`}
+                className={`token ${activeToken === tokenIndex ? "active" : ""}`}
+                onClick={() => setActiveToken(tokenIndex)}
+              >
+                <div>{tokenTextWithTaamim(token, tokenTaamim)}</div>
+                <div>
+                  {tokenTaamim.map((t) => (
                     <span
                       key={t.taamId}
                       className={`badge ${selectedTaamId === t.taamId ? "selected" : ""}`}
@@ -284,9 +449,10 @@ export default function HomePage() {
                       {t.unicodeMark} {t.name}
                     </span>
                   ))}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </section>
 

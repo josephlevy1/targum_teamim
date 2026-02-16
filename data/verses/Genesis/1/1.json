@@ -1,0 +1,772 @@
+{
+  "verse": {
+    "id": "Genesis:1:1",
+    "hebrewTokens": [
+      {
+        "tokenId": "he_Genesis:1:1_0",
+        "surface": "בְּרֵאשִׁ֖ית",
+        "letters": [
+          {
+            "letterId": "l_he_Genesis:1:1_0_0",
+            "baseChar": "ב",
+            "niqqud": [
+              "ְ",
+              "ּ"
+            ],
+            "taamim": []
+          },
+          {
+            "letterId": "l_he_Genesis:1:1_0_1",
+            "baseChar": "ר",
+            "niqqud": [
+              "ֵ"
+            ],
+            "taamim": []
+          },
+          {
+            "letterId": "l_he_Genesis:1:1_0_2",
+            "baseChar": "א",
+            "niqqud": [],
+            "taamim": []
+          },
+          {
+            "letterId": "l_he_Genesis:1:1_0_3",
+            "baseChar": "ש",
+            "niqqud": [
+              "ִ",
+              "ׁ"
+            ],
+            "taamim": [
+              {
+                "taamId": "t_he_Genesis:1:1_0_l_he_Genesis:1:1_0_3_0",
+                "name": "TIPEHA",
+                "unicodeMark": "֖",
+                "tier": "CONJUNCTIVE",
+                "position": {
+                  "tokenId": "he_Genesis:1:1_0",
+                  "letterId": "l_he_Genesis:1:1_0_3"
+                }
+              }
+            ]
+          },
+          {
+            "letterId": "l_he_Genesis:1:1_0_4",
+            "baseChar": "י",
+            "niqqud": [],
+            "taamim": []
+          },
+          {
+            "letterId": "l_he_Genesis:1:1_0_5",
+            "baseChar": "ת",
+            "niqqud": [],
+            "taamim": []
+          }
+        ]
+      },
+      {
+        "tokenId": "he_Genesis:1:1_1",
+        "surface": "בָּרָ֣א",
+        "letters": [
+          {
+            "letterId": "l_he_Genesis:1:1_1_0",
+            "baseChar": "ב",
+            "niqqud": [
+              "ָ",
+              "ּ"
+            ],
+            "taamim": []
+          },
+          {
+            "letterId": "l_he_Genesis:1:1_1_1",
+            "baseChar": "ר",
+            "niqqud": [
+              "ָ"
+            ],
+            "taamim": [
+              {
+                "taamId": "t_he_Genesis:1:1_1_l_he_Genesis:1:1_1_1_0",
+                "name": "MUNAH",
+                "unicodeMark": "֣",
+                "tier": "CONJUNCTIVE",
+                "position": {
+                  "tokenId": "he_Genesis:1:1_1",
+                  "letterId": "l_he_Genesis:1:1_1_1"
+                }
+              }
+            ]
+          },
+          {
+            "letterId": "l_he_Genesis:1:1_1_2",
+            "baseChar": "א",
+            "niqqud": [],
+            "taamim": []
+          }
+        ]
+      },
+      {
+        "tokenId": "he_Genesis:1:1_2",
+        "surface": "אֱלֹהִ֑ים",
+        "letters": [
+          {
+            "letterId": "l_he_Genesis:1:1_2_0",
+            "baseChar": "א",
+            "niqqud": [
+              "ֱ"
+            ],
+            "taamim": []
+          },
+          {
+            "letterId": "l_he_Genesis:1:1_2_1",
+            "baseChar": "ל",
+            "niqqud": [
+              "ֹ"
+            ],
+            "taamim": []
+          },
+          {
+            "letterId": "l_he_Genesis:1:1_2_2",
+            "baseChar": "ה",
+            "niqqud": [
+              "ִ"
+            ],
+            "taamim": [
+              {
+                "taamId": "t_he_Genesis:1:1_2_l_he_Genesis:1:1_2_2_0",
+                "name": "ETNACHTA",
+                "unicodeMark": "֑",
+                "tier": "DISJUNCTIVE",
+                "position": {
+                  "tokenId": "he_Genesis:1:1_2",
+                  "letterId": "l_he_Genesis:1:1_2_2"
+                }
+              }
+            ]
+          },
+          {
+            "letterId": "l_he_Genesis:1:1_2_3",
+            "baseChar": "י",
+            "niqqud": [],
+            "taamim": []
+          },
+          {
+            "letterId": "l_he_Genesis:1:1_2_4",
+            "baseChar": "ם",
+            "niqqud": [],
+            "taamim": []
+          }
+        ]
+      },
+      {
+        "tokenId": "he_Genesis:1:1_3",
+        "surface": "אֵ֥ת",
+        "letters": [
+          {
+            "letterId": "l_he_Genesis:1:1_3_0",
+            "baseChar": "א",
+            "niqqud": [
+              "ֵ"
+            ],
+            "taamim": [
+              {
+                "taamId": "t_he_Genesis:1:1_3_l_he_Genesis:1:1_3_0_0",
+                "name": "MERKHA",
+                "unicodeMark": "֥",
+                "tier": "CONJUNCTIVE",
+                "position": {
+                  "tokenId": "he_Genesis:1:1_3",
+                  "letterId": "l_he_Genesis:1:1_3_0"
+                }
+              }
+            ]
+          },
+          {
+            "letterId": "l_he_Genesis:1:1_3_1",
+            "baseChar": "ת",
+            "niqqud": [],
+            "taamim": []
+          }
+        ]
+      },
+      {
+        "tokenId": "he_Genesis:1:1_4",
+        "surface": "הַשָּׁמַ֖יִם",
+        "letters": [
+          {
+            "letterId": "l_he_Genesis:1:1_4_0",
+            "baseChar": "ה",
+            "niqqud": [
+              "ַ"
+            ],
+            "taamim": []
+          },
+          {
+            "letterId": "l_he_Genesis:1:1_4_1",
+            "baseChar": "ש",
+            "niqqud": [
+              "ָ",
+              "ּ",
+              "ׁ"
+            ],
+            "taamim": []
+          },
+          {
+            "letterId": "l_he_Genesis:1:1_4_2",
+            "baseChar": "מ",
+            "niqqud": [
+              "ַ"
+            ],
+            "taamim": [
+              {
+                "taamId": "t_he_Genesis:1:1_4_l_he_Genesis:1:1_4_2_0",
+                "name": "TIPEHA",
+                "unicodeMark": "֖",
+                "tier": "CONJUNCTIVE",
+                "position": {
+                  "tokenId": "he_Genesis:1:1_4",
+                  "letterId": "l_he_Genesis:1:1_4_2"
+                }
+              }
+            ]
+          },
+          {
+            "letterId": "l_he_Genesis:1:1_4_3",
+            "baseChar": "י",
+            "niqqud": [
+              "ִ"
+            ],
+            "taamim": []
+          },
+          {
+            "letterId": "l_he_Genesis:1:1_4_4",
+            "baseChar": "ם",
+            "niqqud": [],
+            "taamim": []
+          }
+        ]
+      },
+      {
+        "tokenId": "he_Genesis:1:1_5",
+        "surface": "וְאֵ֥ת",
+        "letters": [
+          {
+            "letterId": "l_he_Genesis:1:1_5_0",
+            "baseChar": "ו",
+            "niqqud": [
+              "ְ"
+            ],
+            "taamim": []
+          },
+          {
+            "letterId": "l_he_Genesis:1:1_5_1",
+            "baseChar": "א",
+            "niqqud": [
+              "ֵ"
+            ],
+            "taamim": [
+              {
+                "taamId": "t_he_Genesis:1:1_5_l_he_Genesis:1:1_5_1_0",
+                "name": "MERKHA",
+                "unicodeMark": "֥",
+                "tier": "CONJUNCTIVE",
+                "position": {
+                  "tokenId": "he_Genesis:1:1_5",
+                  "letterId": "l_he_Genesis:1:1_5_1"
+                }
+              }
+            ]
+          },
+          {
+            "letterId": "l_he_Genesis:1:1_5_2",
+            "baseChar": "ת",
+            "niqqud": [],
+            "taamim": []
+          }
+        ]
+      },
+      {
+        "tokenId": "he_Genesis:1:1_6",
+        "surface": "הָאָֽרֶץ׃",
+        "letters": [
+          {
+            "letterId": "l_he_Genesis:1:1_6_0",
+            "baseChar": "ה",
+            "niqqud": [
+              "ָ"
+            ],
+            "taamim": []
+          },
+          {
+            "letterId": "l_he_Genesis:1:1_6_1",
+            "baseChar": "א",
+            "niqqud": [
+              "ָ"
+            ],
+            "taamim": []
+          },
+          {
+            "letterId": "l_he_Genesis:1:1_6_2",
+            "baseChar": "ר",
+            "niqqud": [
+              "ֶ"
+            ],
+            "taamim": []
+          },
+          {
+            "letterId": "l_he_Genesis:1:1_6_3",
+            "baseChar": "ץ",
+            "niqqud": [],
+            "taamim": [
+              {
+                "taamId": "t_he_Genesis:1:1_6_l_he_Genesis:1:1_6_3_0",
+                "name": "SOF_PASUK",
+                "unicodeMark": "׃",
+                "tier": "PISUQ",
+                "position": {
+                  "tokenId": "he_Genesis:1:1_6",
+                  "letterId": "l_he_Genesis:1:1_6_3"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "aramaicTokens": [
+      {
+        "tokenId": "ar_Genesis:1:1_0",
+        "surface": "בְּקַדְמִין",
+        "letters": [
+          {
+            "letterId": "l_ar_Genesis:1:1_0_0",
+            "baseChar": "ב",
+            "niqqud": [
+              "ְ",
+              "ּ"
+            ],
+            "taamim": []
+          },
+          {
+            "letterId": "l_ar_Genesis:1:1_0_1",
+            "baseChar": "ק",
+            "niqqud": [
+              "ַ"
+            ],
+            "taamim": []
+          },
+          {
+            "letterId": "l_ar_Genesis:1:1_0_2",
+            "baseChar": "ד",
+            "niqqud": [
+              "ְ"
+            ],
+            "taamim": []
+          },
+          {
+            "letterId": "l_ar_Genesis:1:1_0_3",
+            "baseChar": "מ",
+            "niqqud": [
+              "ִ"
+            ],
+            "taamim": []
+          },
+          {
+            "letterId": "l_ar_Genesis:1:1_0_4",
+            "baseChar": "י",
+            "niqqud": [],
+            "taamim": []
+          },
+          {
+            "letterId": "l_ar_Genesis:1:1_0_5",
+            "baseChar": "ן",
+            "niqqud": [],
+            "taamim": []
+          }
+        ]
+      },
+      {
+        "tokenId": "ar_Genesis:1:1_1",
+        "surface": "בְּרָא",
+        "letters": [
+          {
+            "letterId": "l_ar_Genesis:1:1_1_0",
+            "baseChar": "ב",
+            "niqqud": [
+              "ְ",
+              "ּ"
+            ],
+            "taamim": []
+          },
+          {
+            "letterId": "l_ar_Genesis:1:1_1_1",
+            "baseChar": "ר",
+            "niqqud": [
+              "ָ"
+            ],
+            "taamim": []
+          },
+          {
+            "letterId": "l_ar_Genesis:1:1_1_2",
+            "baseChar": "א",
+            "niqqud": [],
+            "taamim": []
+          }
+        ]
+      },
+      {
+        "tokenId": "ar_Genesis:1:1_2",
+        "surface": "יְיָ",
+        "letters": [
+          {
+            "letterId": "l_ar_Genesis:1:1_2_0",
+            "baseChar": "י",
+            "niqqud": [
+              "ְ"
+            ],
+            "taamim": []
+          },
+          {
+            "letterId": "l_ar_Genesis:1:1_2_1",
+            "baseChar": "י",
+            "niqqud": [
+              "ָ"
+            ],
+            "taamim": []
+          }
+        ]
+      },
+      {
+        "tokenId": "ar_Genesis:1:1_3",
+        "surface": "יָת",
+        "letters": [
+          {
+            "letterId": "l_ar_Genesis:1:1_3_0",
+            "baseChar": "י",
+            "niqqud": [
+              "ָ"
+            ],
+            "taamim": []
+          },
+          {
+            "letterId": "l_ar_Genesis:1:1_3_1",
+            "baseChar": "ת",
+            "niqqud": [],
+            "taamim": []
+          }
+        ]
+      },
+      {
+        "tokenId": "ar_Genesis:1:1_4",
+        "surface": "שְׁמַיָּא",
+        "letters": [
+          {
+            "letterId": "l_ar_Genesis:1:1_4_0",
+            "baseChar": "ש",
+            "niqqud": [
+              "ְ",
+              "ׁ"
+            ],
+            "taamim": []
+          },
+          {
+            "letterId": "l_ar_Genesis:1:1_4_1",
+            "baseChar": "מ",
+            "niqqud": [
+              "ַ"
+            ],
+            "taamim": []
+          },
+          {
+            "letterId": "l_ar_Genesis:1:1_4_2",
+            "baseChar": "י",
+            "niqqud": [
+              "ָ",
+              "ּ"
+            ],
+            "taamim": []
+          },
+          {
+            "letterId": "l_ar_Genesis:1:1_4_3",
+            "baseChar": "א",
+            "niqqud": [],
+            "taamim": []
+          }
+        ]
+      },
+      {
+        "tokenId": "ar_Genesis:1:1_5",
+        "surface": "וְיָת",
+        "letters": [
+          {
+            "letterId": "l_ar_Genesis:1:1_5_0",
+            "baseChar": "ו",
+            "niqqud": [
+              "ְ"
+            ],
+            "taamim": []
+          },
+          {
+            "letterId": "l_ar_Genesis:1:1_5_1",
+            "baseChar": "י",
+            "niqqud": [
+              "ָ"
+            ],
+            "taamim": []
+          },
+          {
+            "letterId": "l_ar_Genesis:1:1_5_2",
+            "baseChar": "ת",
+            "niqqud": [],
+            "taamim": []
+          }
+        ]
+      },
+      {
+        "tokenId": "ar_Genesis:1:1_6",
+        "surface": "אַרְעָא",
+        "letters": [
+          {
+            "letterId": "l_ar_Genesis:1:1_6_0",
+            "baseChar": "א",
+            "niqqud": [
+              "ַ"
+            ],
+            "taamim": []
+          },
+          {
+            "letterId": "l_ar_Genesis:1:1_6_1",
+            "baseChar": "ר",
+            "niqqud": [
+              "ְ"
+            ],
+            "taamim": []
+          },
+          {
+            "letterId": "l_ar_Genesis:1:1_6_2",
+            "baseChar": "ע",
+            "niqqud": [
+              "ָ"
+            ],
+            "taamim": []
+          },
+          {
+            "letterId": "l_ar_Genesis:1:1_6_3",
+            "baseChar": "א",
+            "niqqud": [],
+            "taamim": []
+          }
+        ]
+      }
+    ]
+  },
+  "generated": [
+    {
+      "taamId": "t_he_Genesis:1:1_0_l_he_Genesis:1:1_0_3_0",
+      "name": "TIPEHA",
+      "unicodeMark": "֖",
+      "tier": "CONJUNCTIVE",
+      "position": {
+        "tokenIndex": 0,
+        "letterIndex": 5
+      },
+      "confidence": 0.7,
+      "reasons": [
+        "segment-size-match"
+      ]
+    },
+    {
+      "taamId": "t_he_Genesis:1:1_1_l_he_Genesis:1:1_1_1_0",
+      "name": "MUNAH",
+      "unicodeMark": "֣",
+      "tier": "CONJUNCTIVE",
+      "position": {
+        "tokenIndex": 1,
+        "letterIndex": 2
+      },
+      "confidence": 0.7,
+      "reasons": [
+        "segment-size-match"
+      ]
+    },
+    {
+      "taamId": "t_he_Genesis:1:1_2_l_he_Genesis:1:1_2_2_0",
+      "name": "ETNACHTA",
+      "unicodeMark": "֑",
+      "tier": "DISJUNCTIVE",
+      "position": {
+        "tokenIndex": 2,
+        "letterIndex": 1
+      },
+      "confidence": 0.8999999999999999,
+      "reasons": [
+        "segment-size-match",
+        "segment-terminal-aligned"
+      ]
+    },
+    {
+      "taamId": "t_he_Genesis:1:1_3_l_he_Genesis:1:1_3_0_0",
+      "name": "MERKHA",
+      "unicodeMark": "֥",
+      "tier": "CONJUNCTIVE",
+      "position": {
+        "tokenIndex": 3,
+        "letterIndex": 1
+      },
+      "confidence": 0.7,
+      "reasons": [
+        "segment-size-match"
+      ]
+    },
+    {
+      "taamId": "t_he_Genesis:1:1_4_l_he_Genesis:1:1_4_2_0",
+      "name": "TIPEHA",
+      "unicodeMark": "֖",
+      "tier": "CONJUNCTIVE",
+      "position": {
+        "tokenIndex": 4,
+        "letterIndex": 3
+      },
+      "confidence": 0.7,
+      "reasons": [
+        "segment-size-match"
+      ]
+    },
+    {
+      "taamId": "t_he_Genesis:1:1_5_l_he_Genesis:1:1_5_1_0",
+      "name": "MERKHA",
+      "unicodeMark": "֥",
+      "tier": "CONJUNCTIVE",
+      "position": {
+        "tokenIndex": 5,
+        "letterIndex": 2
+      },
+      "confidence": 0.7,
+      "reasons": [
+        "segment-size-match"
+      ]
+    },
+    {
+      "taamId": "t_he_Genesis:1:1_6_l_he_Genesis:1:1_6_3_0",
+      "name": "SOF_PASUK",
+      "unicodeMark": "׃",
+      "tier": "PISUQ",
+      "position": {
+        "tokenIndex": 6,
+        "letterIndex": 3
+      },
+      "confidence": 0.99,
+      "reasons": [
+        "sof-pasuk-special-rule",
+        "sof-pasuk-finalized"
+      ]
+    }
+  ],
+  "edited": [
+    {
+      "taamId": "t_he_Genesis:1:1_0_l_he_Genesis:1:1_0_3_0",
+      "name": "TIPEHA",
+      "unicodeMark": "֖",
+      "tier": "CONJUNCTIVE",
+      "position": {
+        "tokenIndex": 0,
+        "letterIndex": 3
+      },
+      "confidence": 0.29999999999999993,
+      "reasons": [
+        "segment-size-match",
+        "manual-move",
+        "manual-move"
+      ]
+    },
+    {
+      "taamId": "t_he_Genesis:1:1_1_l_he_Genesis:1:1_1_1_0",
+      "name": "MUNAH",
+      "unicodeMark": "֣",
+      "tier": "CONJUNCTIVE",
+      "position": {
+        "tokenIndex": 1,
+        "letterIndex": 2
+      },
+      "confidence": 0.7,
+      "reasons": [
+        "segment-size-match"
+      ]
+    },
+    {
+      "taamId": "t_he_Genesis:1:1_2_l_he_Genesis:1:1_2_2_0",
+      "name": "ETNACHTA",
+      "unicodeMark": "֑",
+      "tier": "DISJUNCTIVE",
+      "position": {
+        "tokenIndex": 2,
+        "letterIndex": 1
+      },
+      "confidence": 0.8999999999999999,
+      "reasons": [
+        "segment-size-match",
+        "segment-terminal-aligned"
+      ]
+    },
+    {
+      "taamId": "t_he_Genesis:1:1_3_l_he_Genesis:1:1_3_0_0",
+      "name": "MERKHA",
+      "unicodeMark": "֥",
+      "tier": "CONJUNCTIVE",
+      "position": {
+        "tokenIndex": 3,
+        "letterIndex": 1
+      },
+      "confidence": 0.7,
+      "reasons": [
+        "segment-size-match"
+      ]
+    },
+    {
+      "taamId": "t_he_Genesis:1:1_4_l_he_Genesis:1:1_4_2_0",
+      "name": "TIPEHA",
+      "unicodeMark": "֖",
+      "tier": "CONJUNCTIVE",
+      "position": {
+        "tokenIndex": 4,
+        "letterIndex": 3
+      },
+      "confidence": 0.7,
+      "reasons": [
+        "segment-size-match"
+      ]
+    },
+    {
+      "taamId": "t_he_Genesis:1:1_5_l_he_Genesis:1:1_5_1_0",
+      "name": "MERKHA",
+      "unicodeMark": "֥",
+      "tier": "CONJUNCTIVE",
+      "position": {
+        "tokenIndex": 5,
+        "letterIndex": 2
+      },
+      "confidence": 0.7,
+      "reasons": [
+        "segment-size-match"
+      ]
+    },
+    {
+      "taamId": "t_he_Genesis:1:1_6_l_he_Genesis:1:1_6_3_0",
+      "name": "SOF_PASUK",
+      "unicodeMark": "׃",
+      "tier": "PISUQ",
+      "position": {
+        "tokenIndex": 6,
+        "letterIndex": 3
+      },
+      "confidence": 0.99,
+      "reasons": [
+        "sof-pasuk-special-rule",
+        "sof-pasuk-finalized"
+      ]
+    }
+  ],
+  "state": {
+    "verified": false,
+    "manuscriptNotes": "",
+    "patchCursor": 2
+  }
+}

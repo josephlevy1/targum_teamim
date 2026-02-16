@@ -104,18 +104,35 @@ button {
   cursor: pointer;
 }
 
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 button.primary {
   border-color: var(--accent);
   background: #e6f5fa;
 }
 
+input,
+select,
 textarea {
   width: 100%;
-  min-height: 110px;
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 0.5rem;
   font-family: inherit;
+  background: #fff;
+}
+
+textarea {
+  min-height: 110px;
+}
+
+hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 0.8rem 0;
 }
 
 @media (max-width: 1000px) {
