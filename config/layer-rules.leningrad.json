@@ -1,0 +1,27 @@
+{
+  "disjunctiveBoundaries": [
+    "ETNACHTA",
+    "ZAQEF_QATAN",
+    "ZAQEF_GADOL",
+    "REVIA",
+    "SEGOL",
+    "TEVIR",
+    "GERESH",
+    "GERSHAYIM"
+  ],
+  "taamPrecedence": [
+    "MAHAPAKH",
+    "MUNAH",
+    "MERKHA",
+    "DARGA",
+    "QADMA",
+    "PASHTA",
+    "TIPEHA",
+    "ETNACHTA",
+    "REVIA",
+    "ZAQEF_QATAN",
+    "ZAQEF_GADOL",
+    "SOF_PASUK"
+  ],
+  "sofPasukName": "SOF_PASUK"
+}

@@ -1,0 +1,5 @@
+{
+  "description": "Source import manifest for Hebrew Torah with ta'amim",
+  "format": "TSV verse_id<TAB>text",
+  "example": "Genesis:1:1\tבְּרֵאשִׁ֖ית בָּרָ֣א׃"
+}

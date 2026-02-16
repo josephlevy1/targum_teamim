@@ -1,0 +1,125 @@
+:root {
+  --bg: #f6f1e7;
+  --panel: #fffdf8;
+  --ink: #111111;
+  --muted: #6a5f53;
+  --accent: #005f73;
+  --warn: #9b2226;
+  --ok: #1f7a3f;
+  --border: #ddd3c2;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Source Serif 4", Georgia, serif;
+  color: var(--ink);
+  background:
+    radial-gradient(circle at 10% 10%, #fdf7eb 0, transparent 55%),
+    radial-gradient(circle at 90% 20%, #efe7d8 0, transparent 50%),
+    var(--bg);
+}
+
+main {
+  display: grid;
+  grid-template-columns: 260px 1fr 320px;
+  gap: 1rem;
+  min-height: 100vh;
+  padding: 1rem;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.9rem;
+  overflow: auto;
+}
+
+.verse-item {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.45rem;
+  margin-bottom: 0.35rem;
+  cursor: pointer;
+}
+
+.verse-item.active {
+  border-color: var(--accent);
+  background: #eff8fb;
+}
+
+.row {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.token {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.4rem 0.45rem;
+}
+
+.token.active {
+  border-color: var(--accent);
+}
+
+.hebrew,
+.aramaic {
+  direction: rtl;
+  text-align: right;
+  font-size: 1.45rem;
+  line-height: 1.8;
+}
+
+.small {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.badge {
+  display: inline-block;
+  font-size: 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.1rem 0.35rem;
+  margin: 0.08rem;
+  cursor: pointer;
+}
+
+.badge.selected {
+  border-color: var(--accent);
+  background: #e2f2f8;
+}
+
+button {
+  border: 1px solid var(--border);
+  background: #fefefe;
+  border-radius: 8px;
+  padding: 0.35rem 0.6rem;
+  cursor: pointer;
+}
+
+button.primary {
+  border-color: var(--accent);
+  background: #e6f5fa;
+}
+
+textarea {
+  width: 100%;
+  min-height: 110px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.5rem;
+  font-family: inherit;
+}
+
+@media (max-width: 1000px) {
+  main {
+    grid-template-columns: 1fr;
+  }
+}

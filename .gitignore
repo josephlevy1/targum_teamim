@@ -1,0 +1,17 @@
+node_modules/
+.pnpm-store/
+
+# Next.js
+.next/
+out/
+
+# Build artifacts
+packages/*/dist/
+*.tsbuildinfo
+
+# Local data
+/data/app.db
+/data/exports/
+
+# OS
+.DS_Store

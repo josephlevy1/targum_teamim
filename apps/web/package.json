@@ -1,0 +1,33 @@
+{
+  "name": "web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "pnpm --filter @targum/core build && pnpm --filter @targum/storage build && tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "import:hebrew": "tsx scripts/import-hebrew.ts",
+    "import:targum": "tsx scripts/import-targum.ts",
+    "transpose": "tsx scripts/transpose-range.ts"
+  },
+  "dependencies": {
+    "@targum/core": "workspace:*",
+    "@targum/storage": "workspace:*",
+    "next": "15.1.2",
+    "react": "19.0.0",
+    "react-dom": "19.0.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.1",
+    "@types/react": "^19.0.2",
+    "@types/react-dom": "^19.0.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}
