@@ -262,6 +262,16 @@ textarea {
   margin-top: 0.2rem;
 }
 
+.taam-preset-row {
+  margin-top: 0.35rem;
+  align-items: center;
+}
+
+.taam-preset-row select {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
 .queue-item {
   padding: 0.33rem 0.45rem;
   margin-bottom: 0.25rem;
@@ -297,7 +307,8 @@ textarea {
   min-height: 84px;
 }
 
-.import-drawer {
+.import-drawer,
+.export-drawer {
   grid-column: 1;
   grid-row: 2;
   position: relative;
@@ -308,7 +319,12 @@ textarea {
   overflow: visible;
 }
 
-.import-toggle {
+.export-drawer {
+  grid-column: 3;
+}
+
+.import-toggle,
+.export-toggle {
   width: 100%;
   text-align: left;
   font-weight: 600;
@@ -318,7 +334,8 @@ textarea {
   padding: 0.45rem 0.55rem;
 }
 
-.import-content {
+.import-content,
+.export-content {
   position: absolute;
   left: 0;
   right: 0;
@@ -334,7 +351,8 @@ textarea {
   box-shadow: 0 8px 26px rgba(17, 17, 17, 0.08);
 }
 
-.import-drawer.open .import-content {
+.import-drawer.open .import-content,
+.export-drawer.open .export-content {
   display: block;
   overflow: auto;
 }
@@ -367,12 +385,14 @@ hr {
 
   .center-panel,
   .right-panel,
-  .import-drawer {
+  .import-drawer,
+  .export-drawer {
     grid-column: 1;
     grid-row: auto;
   }
 
-  .import-drawer.open .import-content {
+  .import-drawer.open .import-content,
+  .export-drawer.open .export-content {
     position: static;
     display: block;
     max-height: none;

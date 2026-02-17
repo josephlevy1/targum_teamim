@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { bookRange, chapterRange, sanitizeFileNamePart, verseRange, type ExportRange } from "@/lib/export-ranges";
 
 type Tier = "DISJUNCTIVE" | "CONJUNCTIVE" | "METEG_LIKE" | "PISUQ";
 
@@ -116,6 +117,7 @@ export default function HomePage() {
   const [record, setRecord] = useState<VerseRecord | null>(null);
   const [selectedTaamId, setSelectedTaamId] = useState<string | null>(null);
   const [activeToken, setActiveToken] = useState<number>(0);
+  const [insertPresetName, setInsertPresetName] = useState(TAAM_REPLACEMENTS[0].name);
   const [notes, setNotes] = useState("");
   const [importMode, setImportMode] = useState<"single" | "chapter">("single");
   const [importTarget, setImportTarget] = useState<"hebrew" | "targum" | "both">("both");
@@ -127,6 +129,10 @@ export default function HomePage() {
   const [importBusy, setImportBusy] = useState(false);
   const [importMessage, setImportMessage] = useState("");
   const [importOpen, setImportOpen] = useState(false);
+  const [exportBusy, setExportBusy] = useState(false);
+  const [exportMessage, setExportMessage] = useState("");
+  const [exportOpen, setExportOpen] = useState(false);
+  const [exportActiveAction, setExportActiveAction] = useState<"verse" | "chapter" | "book" | "all" | null>(null);
 
   const selectedTaam = useMemo(() => record?.edited.find((t) => t.taamId === selectedTaamId) ?? null, [record, selectedTaamId]);
   const selectedTaamToken = useMemo(
@@ -196,6 +202,12 @@ export default function HomePage() {
     selectedVerseRef?.book === selectedBook && selectedVerseRef?.chapter
       ? selectedVerseRef.chapter
       : (chapterOptions[0] ?? 0);
+  const verseExportRange = useMemo(() => verseRange(selectedVerseRef?.id ?? ""), [selectedVerseRef]);
+  const chapterExportRange = useMemo(
+    () => chapterRange(sortedVerseRefs, selectedBook, selectedChapter),
+    [sortedVerseRefs, selectedBook, selectedChapter],
+  );
+  const bookExportRange = useMemo(() => bookRange(sortedVerseRefs, selectedBook), [sortedVerseRefs, selectedBook]);
   const verseOptions = useMemo(
     () =>
       sortedVerseRefs
@@ -347,12 +359,98 @@ export default function HomePage() {
     }
   }
 
+  function buildExportUnicodeUrl(range: ExportRange): string {
+    const rawRange = `${range.start}-${range.end}`;
+    return `/api/export/unicode?range=${encodeURIComponent(rawRange)}`;
+  }
+
+  function triggerDownload(blob: Blob, filename: string) {
+    const objectUrl = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = objectUrl;
+    anchor.download = filename;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(objectUrl);
+  }
+
+  async function downloadText(scope: "verse" | "chapter" | "book", filename: string, url: string): Promise<void> {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Failed to export ${scope} text.`);
+    }
+    const text = await response.text();
+    triggerDownload(new Blob([text], { type: "text/plain; charset=utf-8" }), filename);
+  }
+
+  async function downloadJson(filename: string, url: string): Promise<void> {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error("Failed to export JSON.");
+    }
+    const payload = (await response.json()) as { data?: unknown };
+    const json = `${JSON.stringify(payload.data ?? payload, null, 2)}\n`;
+    triggerDownload(new Blob([json], { type: "application/json; charset=utf-8" }), filename);
+  }
+
+  async function runExport(action: "verse" | "chapter" | "book" | "all") {
+    setExportMessage("Exporting...");
+    setExportBusy(true);
+    setExportActiveAction(action);
+
+    try {
+      if (action === "all") {
+        await downloadJson("targum_all.json", "/api/export/json");
+        setExportMessage("Downloaded targum_all.json");
+        return;
+      }
+
+      if (action === "verse") {
+        if (!selectedVerseRef || !verseExportRange) {
+          throw new Error("Select a verse to export.");
+        }
+        const file = `${sanitizeFileNamePart(selectedVerseRef.book)}_ch${selectedVerseRef.chapter}_v${selectedVerseRef.verse}.txt`;
+        await downloadText("verse", file, buildExportUnicodeUrl(verseExportRange));
+        setExportMessage(`Downloaded ${file}`);
+        return;
+      }
+
+      if (action === "chapter") {
+        if (!chapterExportRange || !selectedBook || !selectedChapter) {
+          throw new Error("Select a chapter to export.");
+        }
+        const file = `${sanitizeFileNamePart(selectedBook)}_ch${selectedChapter}.txt`;
+        await downloadText("chapter", file, buildExportUnicodeUrl(chapterExportRange));
+        setExportMessage(`Downloaded ${file}`);
+        return;
+      }
+
+      if (!bookExportRange || !selectedBook) {
+        throw new Error("Select a book to export.");
+      }
+      const file = `${sanitizeFileNamePart(selectedBook)}.txt`;
+      await downloadText("book", file, buildExportUnicodeUrl(bookExportRange));
+      setExportMessage(`Downloaded ${file}`);
+    } catch (error) {
+      setExportMessage(error instanceof Error ? error.message : "Export failed.");
+    } finally {
+      setExportBusy(false);
+      setExportActiveAction(null);
+    }
+  }
+
   async function loadVerse(id: string) {
     const res = await fetch(versePath(id));
     if (!res.ok) return;
     const json = (await res.json()) as VerseRecord;
     setRecord(json);
-    setSelectedTaamId(json.edited[0]?.taamId ?? null);
+    setSelectedTaamId((current) => {
+      if (current && json.edited.some((taam) => taam.taamId === current)) {
+        return current;
+      }
+      return json.edited[0]?.taamId ?? null;
+    });
     setNotes(json.state.manuscriptNotes ?? "");
   }
 
@@ -390,7 +488,11 @@ export default function HomePage() {
 
   async function addAtCursor() {
     if (!record) return;
-    const picked = TAAM_REPLACEMENTS[0];
+    const picked = TAAM_REPLACEMENTS.find((item) => item.name === insertPresetName);
+    if (!picked) return;
+    const tokenIndex = Math.max(0, Math.min(activeToken, record.verse.aramaicTokens.length - 1));
+    const targetToken = record.verse.aramaicTokens[tokenIndex];
+    if (!targetToken) return;
     await postPatch({
       type: "INSERT_TAAM",
       taam: {
@@ -398,7 +500,7 @@ export default function HomePage() {
         name: picked.name,
         unicodeMark: picked.unicodeMark,
         tier: picked.tier,
-        position: { tokenIndex: activeToken, letterIndex: Math.max(0, record.verse.aramaicTokens[activeToken].letters.length - 1) },
+        position: { tokenIndex, letterIndex: Math.max(0, targetToken.letters.length - 1) },
         confidence: 0.4,
         reasons: ["manual-insert"],
       },
@@ -713,6 +815,21 @@ export default function HomePage() {
         <div className="row action-row">
           <button className="primary" onClick={replaceSelected}>R replace</button>
           <button className="danger" onClick={deleteSelected}>D delete</button>
+        </div>
+
+        <div className="small action-label">Add ta’am at current word</div>
+        <div className="row taam-preset-row">
+          <select
+            id="insert-taam-preset"
+            value={insertPresetName}
+            onChange={(e) => setInsertPresetName(e.target.value)}
+          >
+            {TAAM_REPLACEMENTS.map((taam) => (
+              <option key={`insert-preset-${taam.name}`} value={taam.name}>
+                {taam.unicodeMark} {taam.name}
+              </option>
+            ))}
+          </select>
           <button className="primary" onClick={addAtCursor}>A add</button>
         </div>
 
@@ -760,9 +877,9 @@ export default function HomePage() {
       </section>
 
       <section className={`import-drawer ${importOpen ? "open" : ""}`}>
-        <button className="import-toggle" onClick={() => setImportOpen((open) => !open)}>
+        <button className="import-toggle" aria-expanded={importOpen} onClick={() => setImportOpen((open) => !open)}>
           <span>Import</span>
-          <span aria-hidden="true">{importOpen ? "v" : "^"}</span>
+          <span aria-hidden="true">{importOpen ? "▾" : "▸"}</span>
         </button>
         <div className="import-content">
           <h3>Import</h3>
@@ -819,6 +936,48 @@ export default function HomePage() {
             </button>
           </div>
           {importMessage ? <div className="small" style={{ marginTop: 6 }}>{importMessage}</div> : null}
+        </div>
+      </section>
+
+      <section className={`export-drawer ${exportOpen ? "open" : ""}`}>
+        <button className="export-toggle" aria-expanded={exportOpen} onClick={() => setExportOpen((open) => !open)}>
+          <span>Export</span>
+          <span aria-hidden="true">{exportOpen ? "▾" : "▸"}</span>
+        </button>
+        <div className="export-content">
+          <h3>Export</h3>
+          <div className="small">Rendered Targum text for scoped exports</div>
+          <div className="row" style={{ marginTop: 8 }}>
+            <button
+              className={exportActiveAction === "verse" ? "primary" : ""}
+              onClick={() => void runExport("verse")}
+              disabled={exportBusy || !verseExportRange}
+            >
+              Verse (.txt)
+            </button>
+            <button
+              className={exportActiveAction === "chapter" ? "primary" : ""}
+              onClick={() => void runExport("chapter")}
+              disabled={exportBusy || !chapterExportRange}
+            >
+              Chapter (.txt)
+            </button>
+            <button
+              className={exportActiveAction === "book" ? "primary" : ""}
+              onClick={() => void runExport("book")}
+              disabled={exportBusy || !bookExportRange}
+            >
+              Book (.txt)
+            </button>
+            <button
+              className={exportActiveAction === "all" ? "primary" : ""}
+              onClick={() => void runExport("all")}
+              disabled={exportBusy || sortedVerseRefs.length === 0}
+            >
+              All (.json)
+            </button>
+          </div>
+          {exportMessage ? <div className="small" style={{ marginTop: 6 }}>{exportMessage}</div> : null}
         </div>
       </section>
     </main>
