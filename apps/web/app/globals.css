@@ -115,6 +115,33 @@ h4 {
   flex-wrap: wrap;
 }
 
+.center-verse-heading {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.editor-flag-btn {
+  border: 1px solid var(--border);
+  background: #f8f4ec;
+  color: #7e7468;
+  border-radius: 8px;
+  min-width: 2rem;
+  min-height: 1.8rem;
+  padding: 0.2rem 0.35rem;
+  font-size: 1.02rem;
+  line-height: 1;
+  margin-left: 0.08rem;
+  position: relative;
+  top: -1px;
+}
+
+.editor-flag-btn.is-flagged {
+  border-color: #b45357;
+  background: #fff0f1;
+  color: #7f1d1d;
+}
+
 .center-verse-nav {
   margin-top: 5rem;
   justify-content: flex-end;
@@ -167,6 +194,11 @@ h4 {
 .nav-filter-btn.active {
   border-color: var(--accent);
   background: #e6f5fa;
+  font-weight: 600;
+}
+
+.nav-flag-indicator {
+  color: #7f1d1d;
   font-weight: 600;
 }
 

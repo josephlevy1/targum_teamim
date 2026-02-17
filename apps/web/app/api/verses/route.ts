@@ -16,6 +16,7 @@ export async function GET() {
       return {
         verseId: r.verse.id,
         verified: r.state.verified,
+        flagged: r.state.flagged,
         patchCursor: r.state.patchCursor,
         patchCount: r.patches.length,
         avgConfidence,

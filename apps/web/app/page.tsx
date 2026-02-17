@@ -37,7 +37,7 @@ type ParsedVerseRef = {
 };
 
 type VerseSortMode = "sequential" | "confidence_desc" | "confidence_asc";
-type VerseFilterMode = "all" | "verified" | "pending";
+type VerseFilterMode = "all" | "verified" | "pending" | "flagged";
 
 const TAAM_REPLACEMENTS: Array<{ name: string; unicodeMark: string; tier: Tier }> = [
   { name: "MUNAH", unicodeMark: "֣", tier: "CONJUNCTIVE" },
@@ -113,7 +113,7 @@ function parseVerseId(id: string): ParsedVerseRef | null {
 export default function HomePage() {
   const searchParams = useSearchParams();
   const loadVerseRequestSeq = useRef(0);
-  const [verseItems, setVerseItems] = useState<Array<{ verseId: string; verified: boolean; avgConfidence: number }>>([]);
+  const [verseItems, setVerseItems] = useState<Array<{ verseId: string; verified: boolean; flagged: boolean; avgConfidence: number }>>([]);
   const [verseId, setVerseId] = useState<string>("");
   const [didHydrateFromQuery, setDidHydrateFromQuery] = useState(false);
   const [verseSortMode, setVerseSortMode] = useState<VerseSortMode>("sequential");
@@ -190,7 +190,7 @@ export default function HomePage() {
         .filter(
           (
             item,
-          ): item is { verseId: string; verified: boolean; avgConfidence: number; ref: ParsedVerseRef } => item !== null,
+          ): item is { verseId: string; verified: boolean; flagged: boolean; avgConfidence: number; ref: ParsedVerseRef } => item !== null,
         ),
     [verseItems],
   );
@@ -265,6 +265,7 @@ export default function HomePage() {
       verseItemsWithRef.filter((item) => {
         if (verseFilterMode === "verified") return item.verified;
         if (verseFilterMode === "pending") return !item.verified;
+        if (verseFilterMode === "flagged") return item.flagged;
         return true;
       }).length,
     [verseFilterMode, verseItemsWithRef],
@@ -280,11 +281,13 @@ export default function HomePage() {
     const filtered = verseItemsWithRef.filter((item) => {
       if (verseFilterMode === "verified") return item.verified;
       if (verseFilterMode === "pending") return !item.verified;
+      if (verseFilterMode === "flagged") return item.flagged;
       return true;
     });
 
     if (verseSortMode === "sequential") {
       const inOrder = filtered.slice().sort((a, b) => compareRefs(a.ref, b.ref));
+      if (verseFilterMode === "flagged") return inOrder;
       if (!selectedVerseRef) return inOrder.slice(0, 20);
       const currentIndex = inOrder.findIndex((item) => item.verseId === verseId);
       const insertionIndex =
@@ -295,21 +298,22 @@ export default function HomePage() {
     }
 
     const direction = verseSortMode === "confidence_desc" ? -1 : 1;
-    return filtered
+    const sorted = filtered
       .slice()
       .sort((a, b) => {
         if (a.avgConfidence === b.avgConfidence) {
           return compareRefs(a.ref, b.ref);
         }
         return (a.avgConfidence - b.avgConfidence) * direction;
-      })
-      .slice(0, 20);
+      });
+    if (verseFilterMode === "flagged") return sorted;
+    return sorted.slice(0, 20);
   }, [verseFilterMode, verseItemsWithRef, verseSortMode, selectedVerseRef]);
 
   async function refreshVerses() {
     const res = await fetch("/api/verses");
     const json = await res.json();
-    const items = json.items as Array<{ verseId: string; verified: boolean; avgConfidence: number }>;
+    const items = json.items as Array<{ verseId: string; verified: boolean; flagged: boolean; avgConfidence: number }>;
     setVerseItems(items);
     if (!verseId && items.length > 0) {
       setVerseId(items[0].verseId);
@@ -704,6 +708,17 @@ export default function HomePage() {
     await refreshVerses();
   }
 
+  async function saveFlagged(flagged: boolean) {
+    if (!record) return;
+    await fetch(versePath(record.verse.id, "/flag"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ flagged }),
+    });
+    await loadVerse(record.verse.id);
+    await refreshVerses();
+  }
+
   function jumpToAdjacentVerse(offset: number) {
     if (selectedVerseIndex < 0) return;
     const target = sortedVerseRefs[selectedVerseIndex + offset];
@@ -869,9 +884,17 @@ export default function HomePage() {
             >
               Pending
             </button>
+            <button
+              className={`subtle nav-filter-btn ${verseFilterMode === "flagged" ? "active" : ""}`}
+              onClick={() => setVerseFilterMode("flagged")}
+            >
+              Flagged
+            </button>
           </div>
           <div className="small nav-meta" style={{ marginTop: 6 }}>
-            Showing top {visibleVerseItems.length} of {filteredVerseCount}
+            {verseFilterMode === "flagged"
+              ? `Showing ${visibleVerseItems.length} of ${filteredVerseCount}`
+              : `Showing top ${visibleVerseItems.length} of ${filteredVerseCount}`}
           </div>
           {visibleVerseItems.map((item) => (
               <div
@@ -882,6 +905,7 @@ export default function HomePage() {
                 <div>{item.verseId}</div>
                 <div className="small">
                   conf {(item.avgConfidence * 100).toFixed(0)}% {item.verified ? "| verified" : "| pending"}
+                  {item.flagged ? <span className="nav-flag-indicator"> | ⚑</span> : null}
                 </div>
               </div>
             ))}
@@ -890,8 +914,18 @@ export default function HomePage() {
 
       <section className="panel center-panel">
         <div className="center-toolbar">
-          <div>
+          <div className="center-verse-heading">
             <h2>{record?.verse.id ?? "No verse loaded"}</h2>
+            <button
+              type="button"
+              className={`editor-flag-btn ${record?.state.flagged ? "is-flagged" : ""}`}
+              aria-label={record?.state.flagged ? "Unflag verse" : "Flag verse"}
+              title={record?.state.flagged ? "Unflag verse" : "Flag verse"}
+              onClick={() => void saveFlagged(!(record?.state.flagged ?? false))}
+              disabled={!record}
+            >
+              {record?.state.flagged ? "⚑" : "⚐"}
+            </button>
           </div>
           <div className="row">
             {transposeConfirmMode ? (
