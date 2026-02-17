@@ -13,6 +13,10 @@ packages/*/dist/
 /data/app.db
 /data/exports/
 /data/verses/
+/data/patches/
 
 # OS
 .DS_Store
+
+/data/app.db-shm
+/data/app.db-wal
