@@ -1,6 +1,6 @@
 import type { VerseId } from "./types.js";
 
-const TORAH_BOOK_ORDER = ["Genesis", "Exodus", "Leviticus", "Numbers", "Deuteronomy"] as const;
+export const TORAH_BOOK_ORDER = ["Genesis", "Exodus", "Leviticus", "Numbers", "Deuteronomy"] as const;
 const TORAH_BOOK_INDEX = new Map<string, number>(TORAH_BOOK_ORDER.map((name, idx) => [name, idx]));
 
 export interface ParsedVerseId {

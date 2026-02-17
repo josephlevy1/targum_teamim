@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { bookRange, chapterRange, sanitizeFileNamePart, verseRange, type ExportRange } from "@/lib/export-ranges";
 
@@ -92,6 +92,8 @@ function tokenPreviewWithLetterHighlight(token: Token, letterIndex: number) {
   );
 }
 
+const TORAH_BOOK_INDEX: Record<string, number> = { Genesis: 0, Exodus: 1, Leviticus: 2, Numbers: 3, Deuteronomy: 4 };
+
 function versePath(verseId: string, suffix = ""): string {
   return `/api/verse/${encodeURIComponent(verseId)}${suffix}`;
 }
@@ -111,6 +113,14 @@ function parseVerseId(id: string): ParsedVerseRef | null {
 }
 
 export default function HomePage() {
+  return (
+    <Suspense>
+      <HomePageInner />
+    </Suspense>
+  );
+}
+
+function HomePageInner() {
   const searchParams = useSearchParams();
   const modeParam = searchParams.get("mode") ?? "";
   const loadVerseRequestSeq = useRef(0);
@@ -174,8 +184,9 @@ export default function HomePage() {
         .map((item) => parseVerseId(item.verseId))
         .filter((item): item is ParsedVerseRef => item !== null)
         .sort((a, b) => {
-          const byBook = a.book.localeCompare(b.book);
-          if (byBook !== 0) return byBook;
+          const aIdx = TORAH_BOOK_INDEX[a.book] ?? 99;
+          const bIdx = TORAH_BOOK_INDEX[b.book] ?? 99;
+          if (aIdx !== bIdx) return aIdx - bIdx;
           if (a.chapter !== b.chapter) return a.chapter - b.chapter;
           return a.verse - b.verse;
         }),

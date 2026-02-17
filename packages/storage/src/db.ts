@@ -5,7 +5,7 @@ import type Database from "better-sqlite3";
 import type { GeneratedTaam, PatchEntry, PatchOp, Verse, VerseId, VerseState } from "@targum/core";
 import { applyPatchLog, compareVerseIdsCanonical, isVerseIdInRange } from "@targum/core";
 
-const require = createRequire(path.join(process.cwd(), "package.json"));
+const require = createRequire(import.meta.url);
 const BetterSqlite3 = require("better-sqlite3") as new (filename: string) => Database.Database;
 
 export interface RepositoryOptions {
@@ -44,6 +44,8 @@ export class TargumRepository {
     ensureDir(path.join(options.dataDir, "patches"));
     this.db = new BetterSqlite3(options.dbPath);
     this.db.pragma("journal_mode = WAL");
+    this.db.pragma("busy_timeout = 5000");
+    this.db.pragma("synchronous = NORMAL");
     this.init();
   }
 

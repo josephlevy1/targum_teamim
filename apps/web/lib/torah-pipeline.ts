@@ -205,7 +205,11 @@ async function fetchText(url: string, options: FetchOptions): Promise<string> {
       if (!res.ok) {
         throw new Error(`HTTP ${res.status} (${url})`);
       }
-      const text = await res.text();
+      const buf = await res.arrayBuffer();
+      const bytes = new Uint8Array(buf);
+      let start = 0;
+      while (start < bytes.length && bytes[start] === 0) start += 1;
+      const text = new TextDecoder("utf-8").decode(bytes.subarray(start));
       if (useCache && cacheFile) {
         fs.mkdirSync(path.dirname(cacheFile), { recursive: true });
         fs.writeFileSync(cacheFile, text, "utf8");
@@ -236,15 +240,45 @@ function parseChapterVerses(html: string, kind: "he" | "ar"): Array<{ verse: num
   const openRe = new RegExp(`<P\\s+class=['"]${klass}['"]`, "i");
   const open = html.search(openRe);
   if (open < 0) {
-    throw new Error(`Unable to find verse block for class=${klass}`);
+    // Fallback: scan the entire HTML for verse anchors (handles corrupted pages)
+    return parseVerseBlocks(html);
   }
   const close = html.indexOf("</P>", open);
   if (close < 0) {
-    throw new Error(`Unable to find closing verse block for class=${klass}`);
+    return parseVerseBlocks(html);
   }
   const start = Math.max(0, open - 120);
   const block = html.slice(start, close + 4);
   return parseVerseBlocks(block);
+}
+
+const SEFARIA_BOOK_NAMES: Record<TorahBookName, string> = {
+  Genesis: "Genesis",
+  Exodus: "Exodus",
+  Leviticus: "Leviticus",
+  Numbers: "Numbers",
+  Deuteronomy: "Deuteronomy",
+};
+
+async function fetchSefariaHebrew(book: TorahBookName, chapter: number): Promise<Array<{ verse: number; text: string }>> {
+  const sBook = SEFARIA_BOOK_NAMES[book];
+  const url = `https://www.sefaria.org/api/v3/texts/${sBook}.${chapter}`;
+  const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
+  if (!res.ok) {
+    throw new Error(`Sefaria HTTP ${res.status} for ${sBook} ${chapter}`);
+  }
+  const data = (await res.json()) as {
+    versions: Array<{ language: string; versionTitle: string; text: string[] }>;
+  };
+  const heVersions = data.versions.filter((v) => v.language === "he");
+  const withTaamim = heVersions.find((v) => v.text?.[0] && /[\u0591-\u05AF]/.test(v.text[0]));
+  if (!withTaamim) {
+    throw new Error(`No Hebrew version with taamim found on Sefaria for ${sBook} ${chapter}`);
+  }
+  return withTaamim.text.map((text, idx) => ({
+    verse: idx + 1,
+    text: text.replace(/\s+/g, " ").trim(),
+  }));
 }
 
 function ensureTorahBook(name: string): TorahBookName {
@@ -384,10 +418,16 @@ export async function scrapeTorah(options: ScrapeOptions = {}): Promise<ScrapeRe
         fetchText(aramaicUrl, { retries, delayMs, cacheDir: paths.cacheDir, useCache }),
       ]);
 
-      const heVerses = parseChapterVerses(heHtml, "he");
+      let heVerses = parseChapterVerses(heHtml, "he");
       const arVerses = parseChapterVerses(arHtml, "ar");
 
-      assertContiguousVerses(book, chapter, heVerses);
+      try {
+        assertContiguousVerses(book, chapter, heVerses);
+      } catch {
+        // Corrupted page (e.g. null-byte padding) — fall back to Sefaria
+        heVerses = await fetchSefariaHebrew(book, chapter);
+        assertContiguousVerses(book, chapter, heVerses);
+      }
       assertContiguousVerses(book, chapter, arVerses);
 
       if (heVerses.length !== arVerses.length) {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { sanitizeFileNamePart } from "@/lib/export-ranges";
 
@@ -22,6 +22,14 @@ type ReadingPayload = {
 };
 
 export default function ReadingPage() {
+  return (
+    <Suspense fallback={<div className="reading-main"><p>Loading…</p></div>}>
+      <ReadingPageInner />
+    </Suspense>
+  );
+}
+
+function ReadingPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [payload, setPayload] = useState<ReadingPayload | null>(null);

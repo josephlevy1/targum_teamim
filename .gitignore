@@ -21,6 +21,19 @@ packages/*/dist/
 /data/imports/full_torah_checkpoint.json
 /data/imports/torah_scrape_manifest.json
 
+# Environment
+.env
+.env.local
+
+# Logs
+logs/
+
+# Backups
+/data/backups/
+
+# PM2
+.pm2/
+
 # OS
 .DS_Store
 

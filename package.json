@@ -8,6 +8,11 @@
     "build": "pnpm -r build",
     "lint": "pnpm -r lint",
     "test": "pnpm -r test",
-    "typecheck": "pnpm -r typecheck"
+    "typecheck": "pnpm -r typecheck",
+    "start:prod": "bash scripts/start.sh",
+    "stop:prod": "bash scripts/stop.sh",
+    "backup": "bash scripts/backup-db.sh",
+    "pm2:status": "pm2 list",
+    "pm2:logs": "pm2 logs"
   }
 }
