@@ -1,4 +1,4 @@
-import { generateForVerse } from "@targum/core";
+import { generateForVerse, isVerseIdInRange } from "@targum/core";
 import { loadTransposeConfig } from "../lib/config";
 import { getRepository } from "../lib/repository";
 
@@ -19,12 +19,11 @@ const cfg = loadTransposeConfig();
 
 let count = 0;
 for (const verseId of repo.listVerseIds()) {
-  if (verseId >= start && verseId <= end) {
-    const record = repo.getVerseRecord(verseId);
-    if (!record) continue;
-    repo.saveGenerated(verseId, generateForVerse(record.verse, cfg));
-    count += 1;
-  }
+  if (!isVerseIdInRange(verseId, start as any, end as any)) continue;
+  const record = repo.getVerseRecord(verseId);
+  if (!record) continue;
+  repo.saveGenerated(verseId, generateForVerse(record.verse, cfg));
+  count += 1;
 }
 
 console.log(`Transposed verses: ${count}`);

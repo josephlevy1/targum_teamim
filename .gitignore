@@ -12,6 +12,7 @@ packages/*/dist/
 # Local data
 /data/app.db
 /data/exports/
+/data/verses/
 
 # OS
 .DS_Store

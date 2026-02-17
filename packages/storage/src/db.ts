@@ -3,7 +3,7 @@ import fs from "node:fs";
 import { createRequire } from "node:module";
 import type Database from "better-sqlite3";
 import type { GeneratedTaam, PatchEntry, PatchOp, Verse, VerseId, VerseState } from "@targum/core";
-import { applyPatchLog } from "@targum/core";
+import { applyPatchLog, compareVerseIdsCanonical, isVerseIdInRange } from "@targum/core";
 
 const require = createRequire(path.join(process.cwd(), "package.json"));
 const BetterSqlite3 = require("better-sqlite3") as new (filename: string) => Database.Database;
@@ -262,9 +262,9 @@ export class TargumRepository {
 
   listVerseIds(): VerseId[] {
     const rows = this.db
-      .prepare("SELECT verse_id FROM verses ORDER BY book, chapter, verse")
+      .prepare("SELECT verse_id FROM verses")
       .all() as Array<{ verse_id: string }>;
-    return rows.map((row) => row.verse_id as VerseId);
+    return rows.map((row) => row.verse_id as VerseId).sort(compareVerseIdsCanonical);
   }
 
   undo(verseId: VerseId): number {
@@ -299,7 +299,7 @@ export class TargumRepository {
   exportJson(range?: { start?: VerseId; end?: VerseId }): unknown {
     let ids = this.listVerseIds();
     if (range?.start || range?.end) {
-      ids = ids.filter((id) => (!range.start || id >= range.start) && (!range.end || id <= range.end));
+      ids = ids.filter((id) => isVerseIdInRange(id, range.start, range.end));
     }
 
     const out = ids
@@ -322,7 +322,7 @@ export class TargumRepository {
   exportUnicode(renderer: (record: VerseRecord) => string, range?: { start?: VerseId; end?: VerseId }): string {
     let ids = this.listVerseIds();
     if (range?.start || range?.end) {
-      ids = ids.filter((id) => (!range.start || id >= range.start) && (!range.end || id <= range.end));
+      ids = ids.filter((id) => isVerseIdInRange(id, range.start, range.end));
     }
 
     return ids

@@ -21,6 +21,8 @@ Input format is TSV: `verse_id<TAB>text`
 pnpm --filter web import:hebrew --file=/absolute/path/hebrew.tsv
 pnpm --filter web import:targum --file=/absolute/path/targum.tsv
 pnpm --filter web transpose --range=Genesis:1:1-Genesis:1:31
+pnpm --filter web scrape:torah
+pnpm --filter web run:torah --resume
 ```
 
 ## API routes

@@ -1,0 +1,45 @@
+{
+  "runAt": "2026-02-17T00:33:56.271Z",
+  "options": {
+    "books": [
+      "Genesis"
+    ],
+    "chapterRange": {
+      "start": 1,
+      "end": 1
+    },
+    "delayMs": 10,
+    "retries": 1,
+    "useCache": false
+  },
+  "books": [
+    {
+      "book": "Genesis",
+      "code": "01",
+      "totalChapters": 50,
+      "selectedChapters": [
+        1
+      ],
+      "chapters": [
+        {
+          "chapter": 1,
+          "hebrewUrl": "http://www.mechon-mamre.org/c/ct/c0101.htm",
+          "aramaicUrl": "http://www.mechon-mamre.org/i/t/u/u0101.htm",
+          "hebrewVerseCount": 31,
+          "aramaicVerseCount": 31
+        }
+      ]
+    }
+  ],
+  "totals": {
+    "hebrewVerses": 31,
+    "aramaicVerses": 31
+  },
+  "mismatches": [],
+  "outputs": {
+    "hebrewTsvPath": "/Users/Joseph/dev/targum_teamim/data/imports/hebrew_torah.tsv",
+    "targumTsvPath": "/Users/Joseph/dev/targum_teamim/data/imports/targum_torah.tsv",
+    "hebrewSha256": "3fba925de116e2d49a3a5001c75f5c369b193b8b45a5da42e306876da6042bc4",
+    "targumSha256": "92dd36a05c60beb9fed5fae24b8eca385c30f439ed852c710c18858469f5740d"
+  }
+}

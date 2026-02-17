@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "updatedAt": "2026-02-17T00:33:56.337Z",
+  "stages": {
+    "scrape": {
+      "status": "completed",
+      "completedAt": "2026-02-17T00:33:56.271Z"
+    },
+    "import-hebrew": {
+      "status": "completed",
+      "completedAt": "2026-02-17T00:33:56.296Z",
+      "detail": "Imported Hebrew verses: 31"
+    },
+    "import-targum": {
+      "status": "completed",
+      "completedAt": "2026-02-17T00:33:56.316Z",
+      "detail": "Imported Targum verses: 31"
+    },
+    "transpose": {
+      "status": "completed",
+      "completedAt": "2026-02-17T00:33:56.334Z",
+      "detail": "Transposed verses: 31"
+    },
+    "post-verify": {
+      "status": "completed",
+      "completedAt": "2026-02-17T00:33:56.337Z",
+      "detail": "Missing generated: 0"
+    }
+  },
+  "transposeProgress": {
+    "Genesis": 1
+  },
+  "stats": {
+    "importedHebrew": 31,
+    "importedTargum": 31,
+    "transposed": 31,
+    "totalVerses": 31,
+    "generatedVerses": 31,
+    "missingGenerated": []
+  }
+}

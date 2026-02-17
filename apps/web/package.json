@@ -12,7 +12,9 @@
     "test": "vitest run --passWithNoTests",
     "import:hebrew": "tsx scripts/import-hebrew.ts",
     "import:targum": "tsx scripts/import-targum.ts",
-    "transpose": "tsx scripts/transpose-range.ts"
+    "transpose": "tsx scripts/transpose-range.ts",
+    "scrape:torah": "tsx scripts/scrape-torah.ts",
+    "run:torah": "tsx scripts/run-torah.ts"
   },
   "dependencies": {
     "@targum/core": "workspace:*",

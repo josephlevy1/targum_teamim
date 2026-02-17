@@ -5,3 +5,4 @@ export * from "./transpose.js";
 export * from "./patches.js";
 export * from "./renderer.js";
 export * from "./workflow.js";
+export * from "./verse-id.js";
