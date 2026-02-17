@@ -34,6 +34,9 @@ type ParsedVerseRef = {
   verse: number;
 };
 
+type VerseSortMode = "sequential" | "confidence_desc" | "confidence_asc";
+type VerseFilterMode = "all" | "verified" | "pending";
+
 const TAAM_REPLACEMENTS: Array<{ name: string; unicodeMark: string; tier: Tier }> = [
   { name: "MUNAH", unicodeMark: "֣", tier: "CONJUNCTIVE" },
   { name: "MERKHA", unicodeMark: "֥", tier: "CONJUNCTIVE" },
@@ -59,6 +62,34 @@ function tokenTextWithTaamim(token: Token, tokenTaamim: GeneratedTaam[]): string
     .join("");
 }
 
+function tokenLetterText(token: Token, letterIndex: number): string {
+  const letter = token.letters[letterIndex];
+  if (!letter) return "";
+  return `${letter.baseChar}${letter.niqqud.join("")}`;
+}
+
+function formatPlacementLabel(position: { tokenIndex: number; letterIndex: number }): string {
+  return `Word ${position.tokenIndex + 1}, Letter ${position.letterIndex + 1}`;
+}
+
+function tokenPreviewWithLetterHighlight(token: Token, letterIndex: number) {
+  return (
+    <span className="token-preview-word" dir="rtl">
+      {token.letters.map((_, idx) => {
+        const text = tokenLetterText(token, idx);
+        if (idx === letterIndex) {
+          return (
+            <strong key={`letter-${idx}`} className="token-preview-letter">
+              {text}
+            </strong>
+          );
+        }
+        return <span key={`letter-${idx}`}>{text}</span>;
+      })}
+    </span>
+  );
+}
+
 function versePath(verseId: string, suffix = ""): string {
   return `/api/verse/${encodeURIComponent(verseId)}${suffix}`;
 }
@@ -80,6 +111,8 @@ function parseVerseId(id: string): ParsedVerseRef | null {
 export default function HomePage() {
   const [verseItems, setVerseItems] = useState<Array<{ verseId: string; verified: boolean; avgConfidence: number }>>([]);
   const [verseId, setVerseId] = useState<string>("");
+  const [verseSortMode, setVerseSortMode] = useState<VerseSortMode>("sequential");
+  const [verseFilterMode, setVerseFilterMode] = useState<VerseFilterMode>("all");
   const [record, setRecord] = useState<VerseRecord | null>(null);
   const [selectedTaamId, setSelectedTaamId] = useState<string | null>(null);
   const [activeToken, setActiveToken] = useState<number>(0);
@@ -96,8 +129,23 @@ export default function HomePage() {
   const [importOpen, setImportOpen] = useState(false);
 
   const selectedTaam = useMemo(() => record?.edited.find((t) => t.taamId === selectedTaamId) ?? null, [record, selectedTaamId]);
+  const selectedTaamToken = useMemo(
+    () => (selectedTaam ? record?.verse.aramaicTokens[selectedTaam.position.tokenIndex] ?? null : null),
+    [record, selectedTaam],
+  );
   const lowConfidence = useMemo(
-    () => (record?.edited ?? []).filter((t) => t.confidence < 0.65).sort((a, b) => a.confidence - b.confidence),
+    () =>
+      (record?.edited ?? [])
+        .filter((t) => t.confidence < 0.65)
+        .sort((a, b) => {
+          if (a.position.tokenIndex !== b.position.tokenIndex) {
+            return a.position.tokenIndex - b.position.tokenIndex;
+          }
+          if (a.position.letterIndex !== b.position.letterIndex) {
+            return a.position.letterIndex - b.position.letterIndex;
+          }
+          return a.name.localeCompare(b.name);
+        }),
     [record],
   );
   const sortedVerseRefs = useMemo(
@@ -111,6 +159,20 @@ export default function HomePage() {
           if (a.chapter !== b.chapter) return a.chapter - b.chapter;
           return a.verse - b.verse;
         }),
+    [verseItems],
+  );
+  const verseItemsWithRef = useMemo(
+    () =>
+      verseItems
+        .map((item) => {
+          const ref = parseVerseId(item.verseId);
+          return ref ? { ...item, ref } : null;
+        })
+        .filter(
+          (
+            item,
+          ): item is { verseId: string; verified: boolean; avgConfidence: number; ref: ParsedVerseRef } => item !== null,
+        ),
     [verseItems],
   );
   const bookOptions = useMemo(
@@ -145,6 +207,51 @@ export default function HomePage() {
     () => sortedVerseRefs.findIndex((ref) => ref.id === verseId),
     [sortedVerseRefs, verseId],
   );
+  const filteredVerseCount = useMemo(
+    () =>
+      verseItemsWithRef.filter((item) => {
+        if (verseFilterMode === "verified") return item.verified;
+        if (verseFilterMode === "pending") return !item.verified;
+        return true;
+      }).length,
+    [verseFilterMode, verseItemsWithRef],
+  );
+  const visibleVerseItems = useMemo(() => {
+    const compareRefs = (a: ParsedVerseRef, b: ParsedVerseRef) => {
+      const byBook = a.book.localeCompare(b.book);
+      if (byBook !== 0) return byBook;
+      if (a.chapter !== b.chapter) return a.chapter - b.chapter;
+      return a.verse - b.verse;
+    };
+
+    const filtered = verseItemsWithRef.filter((item) => {
+      if (verseFilterMode === "verified") return item.verified;
+      if (verseFilterMode === "pending") return !item.verified;
+      return true;
+    });
+
+    if (verseSortMode === "sequential") {
+      const inOrder = filtered.slice().sort((a, b) => compareRefs(a.ref, b.ref));
+      if (!selectedVerseRef) return inOrder.slice(0, 20);
+      const currentIndex = inOrder.findIndex((item) => item.verseId === verseId);
+      const insertionIndex =
+        currentIndex >= 0 ? currentIndex : inOrder.findIndex((item) => compareRefs(item.ref, selectedVerseRef) >= 0);
+      const anchorIndex = insertionIndex >= 0 ? insertionIndex : Math.max(0, inOrder.length - 1);
+      const start = Math.max(0, anchorIndex - 5);
+      return inOrder.slice(start, start + 20);
+    }
+
+    const direction = verseSortMode === "confidence_desc" ? -1 : 1;
+    return filtered
+      .slice()
+      .sort((a, b) => {
+        if (a.avgConfidence === b.avgConfidence) {
+          return compareRefs(a.ref, b.ref);
+        }
+        return (a.avgConfidence - b.avgConfidence) * direction;
+      })
+      .slice(0, 20);
+  }, [verseFilterMode, verseItemsWithRef, verseSortMode, selectedVerseRef]);
 
   async function refreshVerses() {
     const res = await fetch("/api/verses");
@@ -473,11 +580,37 @@ export default function HomePage() {
           <div className="small nav-meta" style={{ marginTop: 6 }}>
             {sortedVerseRefs.length} structured verse IDs loaded
           </div>
-          <div className="small nav-meta" style={{ marginTop: 8 }}>Low-confidence first</div>
-          {verseItems
-            .slice()
-            .sort((a, b) => a.avgConfidence - b.avgConfidence)
-            .map((item) => (
+          <label className="small" style={{ marginTop: 8 }}>Sort by</label>
+          <select value={verseSortMode} onChange={(e) => setVerseSortMode(e.target.value as VerseSortMode)}>
+            <option value="sequential">Sequential</option>
+            <option value="confidence_desc">Confidence Level (descending)</option>
+            <option value="confidence_asc">Confidence Level (ascending)</option>
+          </select>
+          <div className="small nav-meta" style={{ marginTop: 8 }}>Filter</div>
+          <div className="row nav-filter-row">
+            <button
+              className={`subtle nav-filter-btn ${verseFilterMode === "all" ? "active" : ""}`}
+              onClick={() => setVerseFilterMode("all")}
+            >
+              All
+            </button>
+            <button
+              className={`subtle nav-filter-btn ${verseFilterMode === "verified" ? "active" : ""}`}
+              onClick={() => setVerseFilterMode("verified")}
+            >
+              Verified
+            </button>
+            <button
+              className={`subtle nav-filter-btn ${verseFilterMode === "pending" ? "active" : ""}`}
+              onClick={() => setVerseFilterMode("pending")}
+            >
+              Pending
+            </button>
+          </div>
+          <div className="small nav-meta" style={{ marginTop: 6 }}>
+            Showing top {visibleVerseItems.length} of {filteredVerseCount}
+          </div>
+          {visibleVerseItems.map((item) => (
               <div
                 key={item.verseId}
                 className={`verse-item ${item.verseId === verseId ? "active" : ""}`}
@@ -496,17 +629,6 @@ export default function HomePage() {
         <div className="center-toolbar">
           <div>
             <h2>{record?.verse.id ?? "No verse loaded"}</h2>
-            <div className="row center-verse-nav">
-              <button onClick={() => jumpToAdjacentVerse(-1)} disabled={selectedVerseIndex <= 0}>
-                Previous verse
-              </button>
-              <button
-                onClick={() => jumpToAdjacentVerse(1)}
-                disabled={selectedVerseIndex < 0 || selectedVerseIndex >= sortedVerseRefs.length - 1}
-              >
-                Next verse
-              </button>
-            </div>
           </div>
           <div className="row">
             <button className="primary" onClick={runTranspose}>Transpose</button>
@@ -548,6 +670,17 @@ export default function HomePage() {
             );
           })}
         </div>
+        <div className="row center-verse-nav">
+          <button onClick={() => jumpToAdjacentVerse(-1)} disabled={selectedVerseIndex <= 0}>
+            Previous verse
+          </button>
+          <button
+            onClick={() => jumpToAdjacentVerse(1)}
+            disabled={selectedVerseIndex < 0 || selectedVerseIndex >= sortedVerseRefs.length - 1}
+          >
+            Next verse
+          </button>
+        </div>
       </section>
 
       <section className="panel right-panel">
@@ -556,8 +689,13 @@ export default function HomePage() {
           <div className="selected-taam-card">
             <div>{selectedTaam.name}</div>
             <div className="small">
-              token {selectedTaam.position.tokenIndex}, letter {selectedTaam.position.letterIndex}, confidence {(selectedTaam.confidence * 100).toFixed(0)}%
+              {formatPlacementLabel(selectedTaam.position)}, confidence {(selectedTaam.confidence * 100).toFixed(0)}%
             </div>
+            {selectedTaamToken ? (
+              <div className="small token-preview-line">
+                {tokenPreviewWithLetterHighlight(selectedTaamToken, selectedTaam.position.letterIndex)}
+              </div>
+            ) : null}
           </div>
         ) : (
           <div className="small">Select a ta’am badge</div>
@@ -586,7 +724,18 @@ export default function HomePage() {
             className={`verse-item queue-item ${selectedTaamId === t.taamId ? "active" : ""}`}
             onClick={() => setSelectedTaamId(t.taamId)}
           >
-            {t.unicodeMark} {t.name} @ {t.position.tokenIndex}:{t.position.letterIndex} ({(t.confidence * 100).toFixed(0)}%)
+            <div>{t.unicodeMark} {t.name} ({(t.confidence * 100).toFixed(0)}%)</div>
+            <div className="small queue-meta">
+              {formatPlacementLabel(t.position)}
+              {record?.verse.aramaicTokens[t.position.tokenIndex]
+                ? ` • ${record.verse.aramaicTokens[t.position.tokenIndex].surface}`
+                : ""}
+            </div>
+            {record?.verse.aramaicTokens[t.position.tokenIndex] ? (
+              <div className="small token-preview-line">
+                {tokenPreviewWithLetterHighlight(record.verse.aramaicTokens[t.position.tokenIndex], t.position.letterIndex)}
+              </div>
+            ) : null}
           </div>
         ))}
 
@@ -594,7 +743,12 @@ export default function HomePage() {
         <textarea value={notes} onChange={(e) => setNotes(e.target.value)} />
         <div className="row" style={{ marginTop: 8 }}>
           <button onClick={() => saveVerification(false)}>Save Note</button>
-          <button className="primary" onClick={() => saveVerification(true)}>Mark Verified</button>
+          <button
+            className={record?.state.verified ? "primary" : ""}
+            onClick={() => saveVerification(!(record?.state.verified ?? false))}
+          >
+            Mark Verified
+          </button>
         </div>
 
         <h3 className="section-title">Patch History</h3>

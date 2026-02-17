@@ -113,7 +113,8 @@ h4 {
 }
 
 .center-verse-nav {
-  margin-top: 0.2rem;
+  margin-top: 5rem;
+  justify-content: flex-end;
 }
 
 .center-verse-nav button {
@@ -149,6 +150,21 @@ h4 {
 
 .nav-meta {
   line-height: 1.2;
+}
+
+.nav-filter-row {
+  margin-top: 0.25rem;
+  gap: 0.4rem;
+}
+
+.nav-filter-btn {
+  padding: 0.24rem 0.48rem;
+}
+
+.nav-filter-btn.active {
+  border-color: var(--accent);
+  background: #e6f5fa;
+  font-weight: 600;
 }
 
 .badge {
@@ -249,6 +265,32 @@ textarea {
 .queue-item {
   padding: 0.33rem 0.45rem;
   margin-bottom: 0.25rem;
+}
+
+.queue-meta {
+  margin-top: 0.08rem;
+}
+
+.token-preview-line {
+  margin-top: 0.14rem;
+  direction: rtl;
+  text-align: right;
+  font-size: 1rem;
+  line-height: 1.35;
+  color: var(--ink);
+}
+
+.token-preview-word {
+  display: inline-flex;
+  gap: 0.01rem;
+  unicode-bidi: plaintext;
+}
+
+.token-preview-letter {
+  color: #003e4c;
+  background: #d7edf5;
+  border-radius: 4px;
+  padding: 0 0.08rem;
 }
 
 .right-panel textarea {
