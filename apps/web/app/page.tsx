@@ -335,6 +335,15 @@ export default function HomePage() {
     await refreshVerses();
   }
 
+  async function resetCurrentVerse() {
+    if (!record) return;
+    const confirmed = window.confirm(`Reset ${record.verse.id}? This clears all patch history for the verse.`);
+    if (!confirmed) return;
+    await fetch(versePath(record.verse.id, "/reset"), { method: "POST" });
+    await loadVerse(record.verse.id);
+    await refreshVerses();
+  }
+
   async function saveVerification(verified: boolean) {
     if (!record) return;
     await fetch(versePath(record.verse.id, "/verify"), {
@@ -503,6 +512,7 @@ export default function HomePage() {
             <button className="primary" onClick={runTranspose}>Transpose</button>
             <button onClick={undo}>Undo (U)</button>
             <button onClick={redo}>Redo (Shift+U)</button>
+            <button className="danger" onClick={resetCurrentVerse}>Reset Verse</button>
           </div>
         </div>
 

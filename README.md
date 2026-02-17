@@ -34,6 +34,7 @@ pnpm --filter web run:torah --resume
 - `POST /api/verse/:verseId/patch`
 - `POST /api/verse/:verseId/undo`
 - `POST /api/verse/:verseId/redo`
+- `POST /api/verse/:verseId/reset`
 - `POST /api/verse/:verseId/verify`
 - `GET /api/export/json?range=...`
 - `GET /api/export/unicode?range=...`

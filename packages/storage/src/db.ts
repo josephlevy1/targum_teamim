@@ -296,6 +296,16 @@ export class TargumRepository {
     return next;
   }
 
+  resetVerse(verseId: VerseId): number {
+    this.db.prepare("DELETE FROM patches WHERE verse_id = ?").run(verseId);
+    this.db
+      .prepare("UPDATE verse_state SET patch_cursor = 0, updated_at = ? WHERE verse_id = ?")
+      .run(new Date().toISOString(), verseId);
+    this.writePatchMirror(verseId);
+    this.writeVerseMirror(verseId);
+    return 0;
+  }
+
   exportJson(range?: { start?: VerseId; end?: VerseId }): unknown {
     let ids = this.listVerseIds();
     if (range?.start || range?.end) {
