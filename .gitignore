@@ -15,6 +15,12 @@ packages/*/dist/
 /data/verses/
 /data/patches/
 
+# Scraped / generated import artifacts (reproducible via scrape scripts)
+/data/imports/html_cache/
+/data/imports/*.tsv
+/data/imports/full_torah_checkpoint.json
+/data/imports/torah_scrape_manifest.json
+
 # OS
 .DS_Store
 
