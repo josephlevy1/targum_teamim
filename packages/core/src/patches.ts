@@ -41,8 +41,13 @@ export function applyPatch(taamim: GeneratedTaam[], op: PatchOp): GeneratedTaam[
   return next;
 }
 
-export function applyPatchLog(taamim: GeneratedTaam[], entries: PatchEntry[], patchCursor?: number): GeneratedTaam[] {
-  const sorted = [...entries].sort((a, b) => a.seqNo - b.seqNo);
+export function applyPatchLog(
+  taamim: GeneratedTaam[],
+  entries: PatchEntry[],
+  patchCursor?: number,
+  presorted = false,
+): GeneratedTaam[] {
+  const sorted = presorted ? entries : [...entries].sort((a, b) => a.seqNo - b.seqNo);
   const limit = patchCursor ?? sorted.length;
   let current = cloneGenerated(taamim);
 

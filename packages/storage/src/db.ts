@@ -91,6 +91,7 @@ export class TargumRepository {
 
       CREATE INDEX IF NOT EXISTS idx_patches_verse_seq ON patches(verse_id, seq_no);
       CREATE UNIQUE INDEX IF NOT EXISTS idx_patches_verse_seq_unique ON patches(verse_id, seq_no);
+      CREATE INDEX IF NOT EXISTS idx_verses_book_chapter ON verses(book, chapter);
     `);
 
     const verseStateColumns = this.db
@@ -285,6 +286,94 @@ export class TargumRepository {
       .prepare("SELECT verse_id FROM verses")
       .all() as Array<{ verse_id: string }>;
     return rows.map((row) => row.verse_id as VerseId).sort(compareVerseIdsCanonical);
+  }
+
+  listBooksAndChapters(): Array<{ book: string; chapter: number }> {
+    return this.db
+      .prepare("SELECT DISTINCT book, chapter FROM verses ORDER BY book, chapter")
+      .all() as Array<{ book: string; chapter: number }>;
+  }
+
+  getChapterRecords(book: string, chapter: number): VerseRecord[] {
+    const verseRows = this.db
+      .prepare("SELECT verse_id, hebrew_json, aramaic_json FROM verses WHERE book = ? AND chapter = ? ORDER BY verse")
+      .all(book, chapter) as Array<{ verse_id: string; hebrew_json: string; aramaic_json: string }>;
+
+    if (verseRows.length === 0) return [];
+
+    const verseIds = verseRows.map((r) => r.verse_id);
+    const placeholders = verseIds.map(() => "?").join(",");
+
+    const generatedRows = this.db
+      .prepare(`SELECT verse_id, taam_json FROM generated_taamim WHERE verse_id IN (${placeholders})`)
+      .all(...verseIds) as Array<{ verse_id: string; taam_json: string }>;
+
+    const patchRows = this.db
+      .prepare(
+        `SELECT verse_id, id, op_json, author, note, created_at, seq_no FROM patches WHERE verse_id IN (${placeholders}) ORDER BY verse_id, seq_no ASC`,
+      )
+      .all(...verseIds) as Array<{
+      verse_id: string;
+      id: string;
+      op_json: string;
+      author: string;
+      note: string | null;
+      created_at: string;
+      seq_no: number;
+    }>;
+
+    const stateRows = this.db
+      .prepare(`SELECT verse_id, verified, flagged, manuscript_notes, patch_cursor FROM verse_state WHERE verse_id IN (${placeholders})`)
+      .all(...verseIds) as Array<{
+      verse_id: string;
+      verified: number;
+      flagged: number;
+      manuscript_notes: string;
+      patch_cursor: number;
+    }>;
+
+    const generatedMap = new Map(generatedRows.map((r) => [r.verse_id, r]));
+    const patchMap = new Map<string, typeof patchRows>();
+    for (const row of patchRows) {
+      const existing = patchMap.get(row.verse_id) ?? [];
+      existing.push(row);
+      patchMap.set(row.verse_id, existing);
+    }
+    const stateMap = new Map(stateRows.map((r) => [r.verse_id, r]));
+
+    return verseRows.map((vr) => {
+      const verseId = vr.verse_id as VerseId;
+      const generatedRow = generatedMap.get(vr.verse_id);
+      const versePatches = patchMap.get(vr.verse_id) ?? [];
+      const stateRow = stateMap.get(vr.verse_id);
+
+      const verse: Verse = {
+        id: verseId,
+        hebrewTokens: JSON.parse(vr.hebrew_json),
+        aramaicTokens: JSON.parse(vr.aramaic_json),
+      };
+
+      const generated: GeneratedTaam[] = generatedRow ? JSON.parse(generatedRow.taam_json) : [];
+
+      const patches: PatchEntry[] = versePatches.map((row) => ({
+        id: row.id,
+        verseId,
+        op: JSON.parse(row.op_json),
+        author: row.author,
+        note: row.note ?? undefined,
+        createdAt: row.created_at,
+        seqNo: row.seq_no,
+      }));
+
+      const state: VerseState = {
+        verified: Boolean(stateRow?.verified ?? 0),
+        flagged: Boolean(stateRow?.flagged ?? 0),
+        manuscriptNotes: stateRow?.manuscript_notes ?? "",
+        patchCursor: stateRow?.patch_cursor ?? 0,
+      };
+
+      return { verse, generated, patches, state };
+    });
   }
 
   undo(verseId: VerseId): number {

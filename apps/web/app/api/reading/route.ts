@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { applyPatchLog, parseVerseId } from "@targum/core";
+import { applyPatchLog, parseVerseId, TORAH_BOOK_ORDER } from "@targum/core";
 import { getRepository } from "@/lib/repository";
 
 type ReadingVerse = {
@@ -48,8 +48,8 @@ function renderAramaicText(record: ReturnType<ReturnType<typeof getRepository>["
 
 export async function GET(request: Request) {
   const repo = getRepository();
-  const ids = repo.listVerseIds();
-  if (ids.length === 0) {
+  const booksAndChapters = repo.listBooksAndChapters();
+  if (booksAndChapters.length === 0) {
     return NextResponse.json({
       selectedBook: "",
       selectedChapter: 0,
@@ -59,34 +59,34 @@ export async function GET(request: Request) {
     });
   }
 
-  const parsed = ids.map((id) => ({ id, ...parseVerseId(id) }));
-  const books = Array.from(new Set(parsed.map((p) => p.book)));
+  const bookSet = new Set(booksAndChapters.map((bc) => bc.book));
+  const books = TORAH_BOOK_ORDER.filter((b) => bookSet.has(b)) as unknown as string[];
 
   const { searchParams } = new URL(request.url);
   const requestedBook = searchParams.get("book")?.trim() ?? "";
   const requestedChapter = Number(searchParams.get("chapter"));
 
   const selectedBook = books.includes(requestedBook) ? requestedBook : books[0];
-  const chapters = Array.from(new Set(parsed.filter((p) => p.book === selectedBook).map((p) => p.chapter))).sort((a, b) => a - b);
+  const chapters = booksAndChapters
+    .filter((bc) => bc.book === selectedBook)
+    .map((bc) => bc.chapter)
+    .sort((a, b) => a - b);
   const selectedChapter = Number.isInteger(requestedChapter) && chapters.includes(requestedChapter) ? requestedChapter : chapters[0];
 
   if (!selectedBook || !selectedChapter) {
     return NextResponse.json({ error: "Book or chapter not found." }, { status: 404 });
   }
 
-  const verses: ReadingVerse[] = parsed
-    .filter((item) => item.book === selectedBook && item.chapter === selectedChapter)
-    .sort((a, b) => a.verse - b.verse)
-    .map((item) => repo.getVerseRecord(item.id))
-    .filter((record): record is NonNullable<typeof record> => Boolean(record))
-    .map((record) => ({
-      verseId: record.verse.id,
-      verseNumber: parseVerseId(record.verse.id).verse,
-      hebrewText: renderHebrewText(record),
-      aramaicText: renderAramaicText(record),
-      verified: record.state.verified,
-      flagged: record.state.flagged,
-    }));
+  const records = repo.getChapterRecords(selectedBook, selectedChapter);
+
+  const verses: ReadingVerse[] = records.map((record) => ({
+    verseId: record.verse.id,
+    verseNumber: parseVerseId(record.verse.id).verse,
+    hebrewText: renderHebrewText(record),
+    aramaicText: renderAramaicText(record),
+    verified: record.state.verified,
+    flagged: record.state.flagged,
+  }));
 
   return NextResponse.json({
     selectedBook,
