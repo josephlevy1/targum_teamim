@@ -116,8 +116,10 @@ export default function HomePage() {
   const [verseFilterMode, setVerseFilterMode] = useState<VerseFilterMode>("all");
   const [record, setRecord] = useState<VerseRecord | null>(null);
   const [selectedTaamId, setSelectedTaamId] = useState<string | null>(null);
-  const [activeToken, setActiveToken] = useState<number>(0);
+  const [activeToken, setActiveToken] = useState<number | null>(null);
   const [insertPresetName, setInsertPresetName] = useState(TAAM_REPLACEMENTS[0].name);
+  const [editPresetName, setEditPresetName] = useState(TAAM_REPLACEMENTS[0].name);
+  const [editPickerMode, setEditPickerMode] = useState<"add" | "replace" | null>(null);
   const [notes, setNotes] = useState("");
   const [importMode, setImportMode] = useState<"single" | "chapter">("single");
   const [importTarget, setImportTarget] = useState<"hebrew" | "targum" | "both">("both");
@@ -129,6 +131,8 @@ export default function HomePage() {
   const [importBusy, setImportBusy] = useState(false);
   const [importMessage, setImportMessage] = useState("");
   const [importOpen, setImportOpen] = useState(false);
+  const [transposeBusy, setTransposeBusy] = useState(false);
+  const [transposeConfirmMode, setTransposeConfirmMode] = useState(false);
   const [exportBusy, setExportBusy] = useState(false);
   const [exportMessage, setExportMessage] = useState("");
   const [exportOpen, setExportOpen] = useState(false);
@@ -440,12 +444,16 @@ export default function HomePage() {
     }
   }
 
-  async function loadVerse(id: string) {
+  async function loadVerse(id: string, preferredTaamId?: string) {
     const res = await fetch(versePath(id));
     if (!res.ok) return;
     const json = (await res.json()) as VerseRecord;
     setRecord(json);
+    setActiveToken(null);
     setSelectedTaamId((current) => {
+      if (preferredTaamId && json.edited.some((taam) => taam.taamId === preferredTaamId)) {
+        return preferredTaamId;
+      }
       if (current && json.edited.some((taam) => taam.taamId === current)) {
         return current;
       }
@@ -454,24 +462,58 @@ export default function HomePage() {
     setNotes(json.state.manuscriptNotes ?? "");
   }
 
-  async function postPatch(op: unknown, note?: string) {
+  async function postPatch(op: unknown, note?: string, preferredTaamId?: string) {
     if (!record) return;
-    await fetch(versePath(record.verse.id, "/patch"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ op, note }),
-    });
-    await loadVerse(record.verse.id);
-    await refreshVerses();
+    try {
+      const response = await fetch(versePath(record.verse.id, "/patch"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ op, note }),
+      });
+      const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+      if (!response.ok) {
+        throw new Error(payload?.error ?? "Failed to save patch.");
+      }
+      await loadVerse(record.verse.id, preferredTaamId);
+      await refreshVerses();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to save patch.";
+      window.alert(message);
+    }
   }
 
   async function moveSelected(tokenDelta: number, letterDelta: number) {
     if (!record || !selectedTaam) return;
     const tokenCount = record.verse.aramaicTokens.length;
-    const toToken = Math.max(0, Math.min(tokenCount - 1, selectedTaam.position.tokenIndex + tokenDelta));
-    const targetToken = record.verse.aramaicTokens[toToken];
-    const maxLetter = Math.max(0, targetToken.letters.length - 1);
-    const toLetter = Math.max(0, Math.min(maxLetter, selectedTaam.position.letterIndex + letterDelta));
+    if (tokenCount === 0) return;
+    const maxLetterForToken = (tokenIndex: number) =>
+      Math.max(0, (record.verse.aramaicTokens[tokenIndex]?.letters.length ?? 1) - 1);
+
+    let toToken = Math.max(0, Math.min(tokenCount - 1, selectedTaam.position.tokenIndex + tokenDelta));
+    let toLetter = Math.max(0, Math.min(maxLetterForToken(toToken), selectedTaam.position.letterIndex));
+
+    if (letterDelta !== 0) {
+      const step = letterDelta > 0 ? 1 : -1;
+      let remaining = Math.abs(letterDelta);
+
+      while (remaining > 0) {
+        if (step > 0) {
+          const maxLetter = maxLetterForToken(toToken);
+          if (toLetter < maxLetter) {
+            toLetter += 1;
+          } else if (toToken < tokenCount - 1) {
+            toToken += 1;
+            toLetter = 0;
+          }
+        } else if (toLetter > 0) {
+          toLetter -= 1;
+        } else if (toToken > 0) {
+          toToken -= 1;
+          toLetter = maxLetterForToken(toToken);
+        }
+        remaining -= 1;
+      }
+    }
 
     await postPatch({
       type: "MOVE_TAAM",
@@ -486,17 +528,29 @@ export default function HomePage() {
     await postPatch({ type: "DELETE_TAAM", taamId: selectedTaam.taamId });
   }
 
-  async function addAtCursor() {
+  function beginAdd() {
+    if (activeToken === null) return;
+    if (editPickerMode === "add") {
+      setEditPickerMode(null);
+      return;
+    }
+    setEditPresetName(insertPresetName);
+    setEditPickerMode("add");
+  }
+
+  async function addAtCursor(presetName: string) {
     if (!record) return;
-    const picked = TAAM_REPLACEMENTS.find((item) => item.name === insertPresetName);
+    if (activeToken === null) return;
+    const picked = TAAM_REPLACEMENTS.find((item) => item.name === presetName);
     if (!picked) return;
     const tokenIndex = Math.max(0, Math.min(activeToken, record.verse.aramaicTokens.length - 1));
     const targetToken = record.verse.aramaicTokens[tokenIndex];
     if (!targetToken) return;
+    const taamId = crypto.randomUUID();
     await postPatch({
       type: "INSERT_TAAM",
       taam: {
-        taamId: crypto.randomUUID(),
+        taamId,
         name: picked.name,
         unicodeMark: picked.unicodeMark,
         tier: picked.tier,
@@ -504,30 +558,84 @@ export default function HomePage() {
         confidence: 0.4,
         reasons: ["manual-insert"],
       },
-    });
+    }, undefined, taamId);
   }
 
-  async function replaceSelected() {
+  function replaceSelected() {
     if (!selectedTaam) return;
-    const pickedName = window.prompt(`Replace with: ${TAAM_REPLACEMENTS.map((t) => t.name).join(", ")}`, selectedTaam.name);
-    if (!pickedName) return;
-    const picked = TAAM_REPLACEMENTS.find((t) => t.name === pickedName.trim().toUpperCase());
-    if (!picked) return;
-    await postPatch({
-      type: "SWAP_TAAM",
-      taamId: selectedTaam.taamId,
-      oldName: selectedTaam.name,
-      newName: picked.name,
-      newUnicodeMark: picked.unicodeMark,
-      newTier: picked.tier,
-    });
+    if (editPickerMode === "replace") {
+      setEditPickerMode(null);
+      return;
+    }
+    const suggested = TAAM_REPLACEMENTS.find((t) => t.name === selectedTaam.name)?.name ?? TAAM_REPLACEMENTS[0]?.name;
+    if (suggested) {
+      setEditPresetName(suggested);
+    }
+    setEditPickerMode("replace");
   }
 
-  async function runTranspose() {
+  async function applyEditPreset() {
+    if (editPickerMode === "add") {
+      setInsertPresetName(editPresetName);
+      await addAtCursor(editPresetName);
+      setEditPickerMode(null);
+      return;
+    }
+
+    if (editPickerMode === "replace") {
+      if (!selectedTaam) return;
+      const picked = TAAM_REPLACEMENTS.find((t) => t.name === editPresetName);
+      if (!picked) return;
+      await postPatch({
+        type: "SWAP_TAAM",
+        taamId: selectedTaam.taamId,
+        oldName: selectedTaam.name,
+        newName: picked.name,
+        newUnicodeMark: picked.unicodeMark,
+        newTier: picked.tier,
+      });
+      setEditPickerMode(null);
+    }
+  }
+
+  async function runTranspose(clearPatches: boolean) {
     if (!verseId) return;
-    await fetch(`/api/transpose/${encodeURIComponent(verseId)}`, { method: "POST" });
-    await loadVerse(verseId);
-    await refreshVerses();
+    setTransposeBusy(true);
+    try {
+      const response = await fetch(`/api/transpose/${encodeURIComponent(verseId)}`, { method: "POST" });
+      const payload = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Transpose failed.");
+      }
+      if (clearPatches) {
+        const resetResponse = await fetch(versePath(verseId, "/reset"), { method: "POST" });
+        if (!resetResponse.ok) {
+          const resetPayload = (await resetResponse.json()) as { error?: string };
+          throw new Error(resetPayload.error ?? "Transpose succeeded, but clearing patches failed.");
+        }
+      }
+      await loadVerse(verseId);
+      await refreshVerses();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Transpose failed.";
+      window.alert(message);
+    } finally {
+      setTransposeBusy(false);
+      setTransposeConfirmMode(false);
+    }
+  }
+
+  function beginTransposeAgain() {
+    if (!verseId || transposeBusy) return;
+    if ((record?.state.patchCursor ?? 0) > 0) {
+      setTransposeConfirmMode(true);
+      return;
+    }
+    void runTranspose(false);
+  }
+
+  function cancelTransposeConfirm() {
+    setTransposeConfirmMode(false);
   }
 
   async function undo() {
@@ -540,15 +648,6 @@ export default function HomePage() {
   async function redo() {
     if (!record) return;
     await fetch(versePath(record.verse.id, "/redo"), { method: "POST" });
-    await loadVerse(record.verse.id);
-    await refreshVerses();
-  }
-
-  async function resetCurrentVerse() {
-    if (!record) return;
-    const confirmed = window.confirm(`Reset ${record.verse.id}? This clears all patch history for the verse.`);
-    if (!confirmed) return;
-    await fetch(versePath(record.verse.id, "/reset"), { method: "POST" });
     await loadVerse(record.verse.id);
     await refreshVerses();
   }
@@ -581,27 +680,35 @@ export default function HomePage() {
   }, [verseId]);
 
   useEffect(() => {
+    setTransposeConfirmMode(false);
+  }, [verseId]);
+
+  useEffect(() => {
+    setEditPickerMode(null);
+  }, [selectedTaamId, verseId]);
+
+  useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (!record) return;
       if (e.key === "[") {
         e.preventDefault();
-        void moveSelected(-1, 0);
+        void moveSelected(1, 0);
       }
       if (e.key === "]") {
         e.preventDefault();
-        void moveSelected(1, 0);
+        void moveSelected(-1, 0);
       }
       if (e.key === ",") {
         e.preventDefault();
-        void moveSelected(0, -1);
+        void moveSelected(0, 1);
       }
       if (e.key === ".") {
         e.preventDefault();
-        void moveSelected(0, 1);
+        void moveSelected(0, -1);
       }
       if (e.key.toLowerCase() === "r") {
         e.preventDefault();
-        void replaceSelected();
+        replaceSelected();
       }
       if (e.key.toLowerCase() === "d") {
         e.preventDefault();
@@ -609,7 +716,7 @@ export default function HomePage() {
       }
       if (e.key.toLowerCase() === "a") {
         e.preventDefault();
-        void addAtCursor();
+        beginAdd();
       }
       if (e.key.toLowerCase() === "u" && e.shiftKey) {
         e.preventDefault();
@@ -733,10 +840,18 @@ export default function HomePage() {
             <h2>{record?.verse.id ?? "No verse loaded"}</h2>
           </div>
           <div className="row">
-            <button className="primary" onClick={runTranspose}>Transpose</button>
-            <button onClick={undo}>Undo (U)</button>
-            <button onClick={redo}>Redo (Shift+U)</button>
-            <button className="danger" onClick={resetCurrentVerse}>Reset Verse</button>
+            {transposeConfirmMode ? (
+              <button onClick={cancelTransposeConfirm} disabled={transposeBusy}>Cancel</button>
+            ) : null}
+            <button
+              className={transposeConfirmMode ? "danger" : ""}
+              onClick={() => (transposeConfirmMode ? void runTranspose(true) : beginTransposeAgain())}
+              disabled={transposeBusy || !verseId}
+            >
+              {transposeBusy ? "Working..." : transposeConfirmMode ? "Reset Verse" : "Transpose Again"}
+            </button>
+            <button className="shortcut-btn" onClick={undo}>Undo <span className="kbd-hint">U</span></button>
+            <button className="shortcut-btn" onClick={redo}>Redo <span className="kbd-hint">Shift+U</span></button>
           </div>
         </div>
 
@@ -751,7 +866,7 @@ export default function HomePage() {
               <div
                 key={`${token.surface}-${tokenIndex}`}
                 className={`token ${activeToken === tokenIndex ? "active" : ""}`}
-                onClick={() => setActiveToken(tokenIndex)}
+                onClick={() => setActiveToken((current) => (current === tokenIndex ? null : tokenIndex))}
               >
                 <div>{tokenTextWithTaamim(token, tokenTaamim)}</div>
                 <div>
@@ -786,80 +901,120 @@ export default function HomePage() {
       </section>
 
       <section className="panel right-panel">
-        <h3 className="section-title">Selected Ta’am</h3>
-        {selectedTaam ? (
-          <div className="selected-taam-card">
-            <div>{selectedTaam.name}</div>
-            <div className="small">
-              {formatPlacementLabel(selectedTaam.position)}, confidence {(selectedTaam.confidence * 100).toFixed(0)}%
+        <div className="right-panel-content">
+          <section className="right-section">
+            <div className="right-section-label">Selection</div>
+            {selectedTaam ? (
+              <div className="selected-taam-card">
+                <div className="selected-taam-title">{selectedTaam.name}</div>
+                <div className="small">
+                  {formatPlacementLabel(selectedTaam.position)}, confidence {(selectedTaam.confidence * 100).toFixed(0)}%
+                </div>
+                {selectedTaamToken ? (
+                  <div className="small token-preview-line">
+                    {tokenPreviewWithLetterHighlight(selectedTaamToken, selectedTaam.position.letterIndex)}
+                  </div>
+                ) : null}
+              </div>
+            ) : (
+              <div className="small">Select a ta’am badge</div>
+            )}
+          </section>
+
+          <section className="right-section">
+            <div className="right-section-label">Navigate</div>
+            <div className="nav-grid">
+              <button className="subtle nav-btn shortcut-btn" onClick={() => void moveSelected(-1, 0)}><span className="nav-label">▶ Prev word</span><span className="kbd-hint">]</span></button>
+              <button className="subtle nav-btn shortcut-btn" onClick={() => void moveSelected(1, 0)}><span className="nav-label">Next word</span><span className="kbd-hint">[</span><span className="nav-edge-arrow">◀</span></button>
+              <button className="subtle nav-btn shortcut-btn" onClick={() => void moveSelected(0, -1)}><span className="nav-label">▶ Prev letter</span><span className="kbd-hint">.</span></button>
+              <button className="subtle nav-btn shortcut-btn" onClick={() => void moveSelected(0, 1)}><span className="nav-label">Next letter</span><span className="kbd-hint">,</span><span className="nav-edge-arrow">◀</span></button>
             </div>
-            {selectedTaamToken ? (
-              <div className="small token-preview-line">
-                {tokenPreviewWithLetterHighlight(selectedTaamToken, selectedTaam.position.letterIndex)}
+          </section>
+
+          <section className="right-section">
+            <div className="right-section-label">Edit</div>
+            <div className="row action-row">
+              <button
+                className={`${editPickerMode === "replace" ? "primary" : "subtle"} shortcut-btn ${selectedTaam ? "" : "soft-disabled"}`}
+                onClick={replaceSelected}
+                aria-disabled={!selectedTaam}
+                data-disabled-reason={!selectedTaam ? "Select a ta’am to enable Replace" : undefined}
+              >
+                Replace <span className="kbd-hint">R</span>
+              </button>
+              <button
+                className={`${editPickerMode === "add" ? "primary" : "subtle"} shortcut-btn add-tooltip-top ${activeToken === null ? "soft-disabled" : ""}`}
+                onClick={beginAdd}
+                aria-disabled={activeToken === null}
+                data-disabled-reason={activeToken === null ? "Select a word to enable Add" : undefined}
+              >
+                Add <span className="kbd-hint">A</span>
+              </button>
+              <button className="destructive shortcut-btn" onClick={deleteSelected}>Delete <span className="kbd-hint">D</span></button>
+            </div>
+            {editPickerMode ? (
+              <div className="row taam-preset-row">
+                <select
+                  id="edit-taam-preset"
+                  value={editPresetName}
+                  onChange={(e) => setEditPresetName(e.target.value)}
+                >
+                  {TAAM_REPLACEMENTS.map((taam) => (
+                    <option key={`edit-preset-${taam.name}`} value={taam.name}>
+                      {taam.unicodeMark} {taam.name}
+                    </option>
+                  ))}
+                </select>
+                <button className="primary" onClick={applyEditPreset}>
+                  {editPickerMode === "replace" ? "Apply Replace" : "Apply Add"}
+                </button>
               </div>
             ) : null}
-          </div>
-        ) : (
-          <div className="small">Select a ta’am badge</div>
-        )}
+          </section>
 
-        <div className="small action-label">Navigate placement</div>
-        <div className="row action-row">
-          <button className="subtle" onClick={() => void moveSelected(-1, 0)}>[ prev word</button>
-          <button className="subtle" onClick={() => void moveSelected(1, 0)}>] next word</button>
-          <button className="subtle" onClick={() => void moveSelected(0, -1)}>, prev letter</button>
-          <button className="subtle" onClick={() => void moveSelected(0, 1)}>. next letter</button>
-        </div>
-
-        <div className="small action-label">Edit placement</div>
-        <div className="row action-row">
-          <button className="primary" onClick={replaceSelected}>R replace</button>
-          <button className="danger" onClick={deleteSelected}>D delete</button>
-        </div>
-
-        <div className="small action-label">Add ta’am at current word</div>
-        <div className="row taam-preset-row">
-          <select
-            id="insert-taam-preset"
-            value={insertPresetName}
-            onChange={(e) => setInsertPresetName(e.target.value)}
-          >
-            {TAAM_REPLACEMENTS.map((taam) => (
-              <option key={`insert-preset-${taam.name}`} value={taam.name}>
-                {taam.unicodeMark} {taam.name}
-              </option>
+          <section className="right-section">
+            <div className="right-section-label">Review</div>
+            <h3 className="section-title">Low-Confidence Queue</h3>
+            <div className="small">{lowConfidence.length} placements</div>
+            {lowConfidence.map((t) => (
+              <div
+                key={`low-${t.taamId}`}
+                className={`verse-item queue-item ${selectedTaamId === t.taamId ? "active" : ""}`}
+                onClick={() => setSelectedTaamId(t.taamId)}
+              >
+                <div>{t.unicodeMark} {t.name} ({(t.confidence * 100).toFixed(0)}%)</div>
+                <div className="small queue-meta">
+                  {formatPlacementLabel(t.position)}
+                  {record?.verse.aramaicTokens[t.position.tokenIndex]
+                    ? ` • ${record.verse.aramaicTokens[t.position.tokenIndex].surface}`
+                    : ""}
+                </div>
+                {record?.verse.aramaicTokens[t.position.tokenIndex] ? (
+                  <div className="small token-preview-line">
+                    {tokenPreviewWithLetterHighlight(record.verse.aramaicTokens[t.position.tokenIndex], t.position.letterIndex)}
+                  </div>
+                ) : null}
+              </div>
             ))}
-          </select>
-          <button className="primary" onClick={addAtCursor}>A add</button>
+
+            <h3 className="section-title">Notes</h3>
+            <textarea value={notes} onChange={(e) => setNotes(e.target.value)} />
+            <div className="row" style={{ marginTop: 8 }}>
+              <button onClick={() => saveVerification(false)}>Save Note</button>
+            </div>
+
+            <details className="patch-history">
+              <summary className="section-title">Patch History</summary>
+              {(record?.patches ?? []).map((p) => (
+                <div key={p.id} className="small">
+                  #{p.seqNo} {p.op.type} {p.note ?? ""}
+                </div>
+              ))}
+            </details>
+          </section>
         </div>
 
-        <h3 className="section-title">Low-Confidence Queue</h3>
-        <div className="small">{lowConfidence.length} placements</div>
-        {lowConfidence.map((t) => (
-          <div
-            key={`low-${t.taamId}`}
-            className={`verse-item queue-item ${selectedTaamId === t.taamId ? "active" : ""}`}
-            onClick={() => setSelectedTaamId(t.taamId)}
-          >
-            <div>{t.unicodeMark} {t.name} ({(t.confidence * 100).toFixed(0)}%)</div>
-            <div className="small queue-meta">
-              {formatPlacementLabel(t.position)}
-              {record?.verse.aramaicTokens[t.position.tokenIndex]
-                ? ` • ${record.verse.aramaicTokens[t.position.tokenIndex].surface}`
-                : ""}
-            </div>
-            {record?.verse.aramaicTokens[t.position.tokenIndex] ? (
-              <div className="small token-preview-line">
-                {tokenPreviewWithLetterHighlight(record.verse.aramaicTokens[t.position.tokenIndex], t.position.letterIndex)}
-              </div>
-            ) : null}
-          </div>
-        ))}
-
-        <h3 className="section-title">Manuscript Notes</h3>
-        <textarea value={notes} onChange={(e) => setNotes(e.target.value)} />
-        <div className="row" style={{ marginTop: 8 }}>
-          <button onClick={() => saveVerification(false)}>Save Note</button>
+        <div className="right-panel-footer">
           <button
             className={record?.state.verified ? "primary" : ""}
             onClick={() => saveVerification(!(record?.state.verified ?? false))}
@@ -867,13 +1022,6 @@ export default function HomePage() {
             Mark Verified
           </button>
         </div>
-
-        <h3 className="section-title">Patch History</h3>
-        {(record?.patches ?? []).map((p) => (
-          <div key={p.id} className="small">
-            #{p.seqNo} {p.op.type} {p.note ?? ""}
-          </div>
-        ))}
       </section>
 
       <section className={`import-drawer ${importOpen ? "open" : ""}`}>

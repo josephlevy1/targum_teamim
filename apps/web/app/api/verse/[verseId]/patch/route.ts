@@ -28,15 +28,20 @@ const patchSchema = z.discriminatedUnion("type", [
 ]);
 
 export async function POST(request: Request, ctx: { params: Promise<{ verseId: string }> }) {
-  const { verseId } = await ctx.params;
-  const body = await request.json();
-  const parsed = patchSchema.safeParse(body.op);
-  if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid patch operation", details: parsed.error.flatten() }, { status: 400 });
-  }
+  try {
+    const { verseId } = await ctx.params;
+    const body = await request.json();
+    const parsed = patchSchema.safeParse(body.op);
+    if (!parsed.success) {
+      return NextResponse.json({ error: "Invalid patch operation", details: parsed.error.flatten() }, { status: 400 });
+    }
 
-  const note = typeof body.note === "string" ? body.note : undefined;
-  const repo = getRepository();
-  const entry = repo.addPatch(verseId as any, parsed.data as any, note);
-  return NextResponse.json(entry);
+    const note = typeof body.note === "string" ? body.note : undefined;
+    const repo = getRepository();
+    const entry = repo.addPatch(verseId as any, parsed.data as any, note);
+    return NextResponse.json(entry);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to apply patch.";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 }

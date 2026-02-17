@@ -77,6 +77,9 @@ h4 {
 .right-panel {
   grid-column: 3;
   grid-row: 1;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .verse-item {
@@ -236,7 +239,9 @@ textarea {
 }
 
 .section-title {
-  margin-top: 0.75rem;
+  margin-top: 0.5rem;
+  font-size: 0.88rem;
+  font-weight: 700;
 }
 
 .right-panel .section-title:first-child {
@@ -247,11 +252,46 @@ textarea {
   line-height: 1.15;
 }
 
+.right-panel-content {
+  flex: 1 1 auto;
+  overflow: auto;
+  padding: 0.75rem;
+  scrollbar-gutter: stable;
+}
+
+.right-section {
+  padding-bottom: 0.75rem;
+  margin-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.right-section:last-child {
+  border-bottom: 0;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.right-section-label {
+  font-size: 0.7rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+
 .selected-taam-card {
   border: 1px solid var(--accent);
   background: #ecf7fb;
   border-radius: 10px;
-  padding: 0.45rem 0.55rem;
+  padding: 0.5rem 0.6rem;
+}
+
+.selected-taam-title {
+  font-size: 1.15rem;
+  line-height: 1.2;
+  margin-bottom: 0.2rem;
+  font-weight: 700;
 }
 
 .action-label {
@@ -259,11 +299,11 @@ textarea {
 }
 
 .action-row {
-  margin-top: 0.2rem;
+  margin-top: 0.1rem;
 }
 
 .taam-preset-row {
-  margin-top: 0.35rem;
+  margin-top: 0.1rem;
   align-items: center;
 }
 
@@ -279,6 +319,74 @@ textarea {
 
 .queue-meta {
   margin-top: 0.08rem;
+}
+
+.nav-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  direction: rtl;
+}
+
+.nav-btn {
+  width: 100%;
+  text-align: left;
+  direction: ltr;
+}
+
+.shortcut-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.5rem;
+  line-height: 1.1;
+}
+
+.shortcut-btn .kbd-hint {
+  margin-left: auto;
+  flex: 0 0 auto;
+}
+
+.shortcut-btn.soft-disabled {
+  opacity: 0.6;
+  cursor: help;
+  position: relative;
+}
+
+.shortcut-btn.soft-disabled::after {
+  content: attr(data-disabled-reason);
+  position: absolute;
+  left: calc(100% + 0.45rem);
+  top: 50%;
+  transform: translateY(-50%);
+  background: #2f2a24;
+  color: #fffdf8;
+  border-radius: 6px;
+  padding: 0.28rem 0.42rem;
+  font-size: 0.72rem;
+  max-width: none;
+  white-space: nowrap;
+  text-align: left;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 100ms ease;
+  z-index: 10;
+}
+
+.shortcut-btn.soft-disabled:hover::after,
+.shortcut-btn.soft-disabled:focus-visible::after {
+  opacity: 1;
+}
+
+.shortcut-btn.add-tooltip-top.soft-disabled::after {
+  left: 50%;
+  top: auto;
+  bottom: calc(100% + 0.35rem);
+  transform: translateX(-50%);
+}
+
+.nav-edge-arrow {
+  flex: 0 0 auto;
 }
 
 .token-preview-line {
@@ -305,6 +413,74 @@ textarea {
 
 .right-panel textarea {
   min-height: 84px;
+  margin-top: 0.15rem;
+}
+
+button.destructive {
+  border-color: var(--border);
+  color: var(--muted);
+  background: #faf8f3;
+}
+
+button.destructive:hover,
+button.destructive:focus-visible {
+  border-color: #b45357;
+  color: #6b1115;
+  background: #fff0f1;
+}
+
+.kbd-hint {
+  display: inline-block;
+  margin-left: 0.32rem;
+  padding: 0.05rem 0.34rem;
+  border-radius: 6px;
+  border: 1px solid #d2c8b8;
+  background: #f3ede2;
+  color: #5b5145;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.78em;
+  line-height: 1.15;
+  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.55);
+}
+
+.patch-history {
+  margin-top: 0.75rem;
+}
+
+.patch-history summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.patch-history summary::-webkit-details-marker {
+  display: none;
+}
+
+.patch-history summary::before {
+  content: "▸ ";
+  color: var(--muted);
+}
+
+.patch-history[open] summary::before {
+  content: "▾ ";
+}
+
+.patch-history .small {
+  margin-top: 0.25rem;
+}
+
+.right-panel-footer {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  gap: 0.6rem;
+  padding: 0.75rem;
+  border-top: 1px solid var(--border);
+  background: linear-gradient(to top, #fffdf8 82%, rgba(255, 253, 248, 0.88) 100%);
+}
+
+.right-panel-footer button {
+  flex: 1 1 0;
 }
 
 .import-drawer,
@@ -321,6 +497,7 @@ textarea {
 
 .export-drawer {
   grid-column: 3;
+  z-index: 30;
 }
 
 .import-toggle,
@@ -349,6 +526,10 @@ textarea {
   overflow: hidden;
   z-index: 20;
   box-shadow: 0 8px 26px rgba(17, 17, 17, 0.08);
+}
+
+.export-drawer.open .export-content {
+  z-index: 40;
 }
 
 .import-drawer.open .import-content,
