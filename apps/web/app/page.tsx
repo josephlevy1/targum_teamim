@@ -27,6 +27,13 @@ type VerseRecord = {
   state: { verified: boolean; manuscriptNotes: string; patchCursor: number };
 };
 
+type ParsedVerseRef = {
+  id: string;
+  book: string;
+  chapter: number;
+  verse: number;
+};
+
 const TAAM_REPLACEMENTS: Array<{ name: string; unicodeMark: string; tier: Tier }> = [
   { name: "MUNAH", unicodeMark: "֣", tier: "CONJUNCTIVE" },
   { name: "MERKHA", unicodeMark: "֥", tier: "CONJUNCTIVE" },
@@ -56,6 +63,20 @@ function versePath(verseId: string, suffix = ""): string {
   return `/api/verse/${encodeURIComponent(verseId)}${suffix}`;
 }
 
+function parseVerseId(id: string): ParsedVerseRef | null {
+  const parts = id.split(":");
+  if (parts.length < 3) return null;
+
+  const verse = Number(parts[parts.length - 1]);
+  const chapter = Number(parts[parts.length - 2]);
+  const book = parts.slice(0, -2).join(":").trim();
+
+  if (!book || !Number.isInteger(chapter) || !Number.isInteger(verse)) return null;
+  if (chapter <= 0 || verse <= 0) return null;
+
+  return { id, book, chapter, verse };
+}
+
 export default function HomePage() {
   const [verseItems, setVerseItems] = useState<Array<{ verseId: string; verified: boolean; avgConfidence: number }>>([]);
   const [verseId, setVerseId] = useState<string>("");
@@ -72,11 +93,57 @@ export default function HomePage() {
   const [chapterTargumFile, setChapterTargumFile] = useState<File | null>(null);
   const [importBusy, setImportBusy] = useState(false);
   const [importMessage, setImportMessage] = useState("");
+  const [importOpen, setImportOpen] = useState(false);
 
   const selectedTaam = useMemo(() => record?.edited.find((t) => t.taamId === selectedTaamId) ?? null, [record, selectedTaamId]);
   const lowConfidence = useMemo(
     () => (record?.edited ?? []).filter((t) => t.confidence < 0.65).sort((a, b) => a.confidence - b.confidence),
     [record],
+  );
+  const sortedVerseRefs = useMemo(
+    () =>
+      verseItems
+        .map((item) => parseVerseId(item.verseId))
+        .filter((item): item is ParsedVerseRef => item !== null)
+        .sort((a, b) => {
+          const byBook = a.book.localeCompare(b.book);
+          if (byBook !== 0) return byBook;
+          if (a.chapter !== b.chapter) return a.chapter - b.chapter;
+          return a.verse - b.verse;
+        }),
+    [verseItems],
+  );
+  const bookOptions = useMemo(
+    () => Array.from(new Set(sortedVerseRefs.map((ref) => ref.book))),
+    [sortedVerseRefs],
+  );
+  const selectedVerseRef = useMemo(() => parseVerseId(verseId), [verseId]);
+  const selectedBook = selectedVerseRef?.book ?? bookOptions[0] ?? "";
+  const chapterOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          sortedVerseRefs
+            .filter((ref) => ref.book === selectedBook)
+            .map((ref) => ref.chapter),
+        ),
+      ).sort((a, b) => a - b),
+    [selectedBook, sortedVerseRefs],
+  );
+  const selectedChapter =
+    selectedVerseRef?.book === selectedBook && selectedVerseRef?.chapter
+      ? selectedVerseRef.chapter
+      : (chapterOptions[0] ?? 0);
+  const verseOptions = useMemo(
+    () =>
+      sortedVerseRefs
+        .filter((ref) => ref.book === selectedBook && ref.chapter === selectedChapter)
+        .sort((a, b) => a.verse - b.verse),
+    [selectedBook, selectedChapter, sortedVerseRefs],
+  );
+  const selectedVerseIndex = useMemo(
+    () => sortedVerseRefs.findIndex((ref) => ref.id === verseId),
+    [sortedVerseRefs, verseId],
   );
 
   async function refreshVerses() {
@@ -279,6 +346,12 @@ export default function HomePage() {
     await refreshVerses();
   }
 
+  function jumpToAdjacentVerse(offset: number) {
+    if (selectedVerseIndex < 0) return;
+    const target = sortedVerseRefs[selectedVerseIndex + offset];
+    if (target) setVerseId(target.id);
+  }
+
   useEffect(() => {
     void refreshVerses();
   }, []);
@@ -336,85 +409,96 @@ export default function HomePage() {
 
   return (
     <main>
-      <section className="panel">
-        <h3>Import</h3>
-        <div className="row">
-          <button className={importMode === "single" ? "primary" : ""} onClick={() => setImportMode("single")}>Single passuk</button>
-          <button className={importMode === "chapter" ? "primary" : ""} onClick={() => setImportMode("chapter")}>Chapter TSV</button>
-        </div>
-        <div style={{ marginTop: 8 }}>
-          <label className="small">Target</label>
-          <select value={importTarget} onChange={(e) => setImportTarget(e.target.value as "hebrew" | "targum" | "both")}>
-            <option value="both">Hebrew + Targum</option>
-            <option value="hebrew">Hebrew only</option>
-            <option value="targum">Targum only</option>
-          </select>
-        </div>
-
-        {importMode === "single" ? (
-          <>
-            <label className="small" style={{ marginTop: 8 }}>Verse ID</label>
-            <input value={singleVerseId} onChange={(e) => setSingleVerseId(e.target.value)} placeholder="Genesis:1:1" />
-            {importTarget !== "targum" ? (
-              <>
-                <label className="small" style={{ marginTop: 8 }}>Hebrew text</label>
-                <textarea value={singleHebrew} onChange={(e) => setSingleHebrew(e.target.value)} />
-              </>
-            ) : null}
-            {importTarget !== "hebrew" ? (
-              <>
-                <label className="small" style={{ marginTop: 8 }}>Targum text</label>
-                <textarea value={singleTargum} onChange={(e) => setSingleTargum(e.target.value)} />
-              </>
-            ) : null}
-          </>
-        ) : (
-          <>
-            {importTarget !== "targum" ? (
-              <>
-                <label className="small" style={{ marginTop: 8 }}>Hebrew TSV</label>
-                <input type="file" accept=".tsv,text/tab-separated-values,text/plain" onChange={(e) => setChapterHebrewFile(e.target.files?.[0] ?? null)} />
-              </>
-            ) : null}
-            {importTarget !== "hebrew" ? (
-              <>
-                <label className="small" style={{ marginTop: 8 }}>Targum TSV</label>
-                <input type="file" accept=".tsv,text/tab-separated-values,text/plain" onChange={(e) => setChapterTargumFile(e.target.files?.[0] ?? null)} />
-              </>
-            ) : null}
-          </>
-        )}
-
-        <div className="row" style={{ marginTop: 8 }}>
-          <button className="primary" onClick={runImport} disabled={importBusy}>
-            {importBusy ? "Importing..." : "Import"}
-          </button>
-        </div>
-        {importMessage ? <div className="small" style={{ marginTop: 6 }}>{importMessage}</div> : null}
-
-        <hr />
-        <h3>Verse Navigator</h3>
-        <div className="small">Low-confidence first</div>
-        {verseItems
-          .slice()
-          .sort((a, b) => a.avgConfidence - b.avgConfidence)
-          .map((item) => (
-            <div
-              key={item.verseId}
-              className={`verse-item ${item.verseId === verseId ? "active" : ""}`}
-              onClick={() => setVerseId(item.verseId)}
+      <section className="panel left-panel">
+        <div className="left-scroll nav-scroll">
+          <h3>Verse Navigator</h3>
+          <div className="row left-nav-actions">
+            <button onClick={() => jumpToAdjacentVerse(-1)} disabled={selectedVerseIndex <= 0}>
+              Previous verse
+            </button>
+            <button
+              onClick={() => jumpToAdjacentVerse(1)}
+              disabled={selectedVerseIndex < 0 || selectedVerseIndex >= sortedVerseRefs.length - 1}
             >
-              <div>{item.verseId}</div>
-              <div className="small">
-                conf {(item.avgConfidence * 100).toFixed(0)}% {item.verified ? "| verified" : "| pending"}
+              Next verse
+            </button>
+          </div>
+          <label className="small" style={{ marginTop: 8 }}>Book</label>
+          <select
+            value={selectedBook}
+            onChange={(e) => {
+              const nextBook = e.target.value;
+              const firstInBook = sortedVerseRefs.find((ref) => ref.book === nextBook);
+              if (firstInBook) setVerseId(firstInBook.id);
+            }}
+          >
+            {bookOptions.map((book) => (
+              <option key={book} value={book}>
+                {book}
+              </option>
+            ))}
+          </select>
+          <label className="small" style={{ marginTop: 8 }}>Chapter</label>
+          <select
+            value={selectedChapter || ""}
+            onChange={(e) => {
+              const nextChapter = Number(e.target.value);
+              const firstInChapter = sortedVerseRefs.find((ref) => ref.book === selectedBook && ref.chapter === nextChapter);
+              if (firstInChapter) setVerseId(firstInChapter.id);
+            }}
+          >
+            {chapterOptions.map((chapter) => (
+              <option key={chapter} value={chapter}>
+                {chapter}
+              </option>
+            ))}
+          </select>
+          <label className="small" style={{ marginTop: 8 }}>Verse</label>
+          <select value={verseId} onChange={(e) => setVerseId(e.target.value)}>
+            {verseOptions.map((ref) => (
+              <option key={ref.id} value={ref.id}>
+                {ref.verse}
+              </option>
+            ))}
+          </select>
+          <div className="small nav-meta" style={{ marginTop: 6 }}>
+            {sortedVerseRefs.length} structured verse IDs loaded
+          </div>
+          <div className="small nav-meta" style={{ marginTop: 8 }}>Low-confidence first</div>
+          {verseItems
+            .slice()
+            .sort((a, b) => a.avgConfidence - b.avgConfidence)
+            .map((item) => (
+              <div
+                key={item.verseId}
+                className={`verse-item ${item.verseId === verseId ? "active" : ""}`}
+                onClick={() => setVerseId(item.verseId)}
+              >
+                <div>{item.verseId}</div>
+                <div className="small">
+                  conf {(item.avgConfidence * 100).toFixed(0)}% {item.verified ? "| verified" : "| pending"}
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+        </div>
       </section>
 
-      <section className="panel">
-        <div className="row" style={{ justifyContent: "space-between" }}>
-          <h2>{record?.verse.id ?? "No verse loaded"}</h2>
+      <section className="panel center-panel">
+        <div className="center-toolbar">
+          <div>
+            <h2>{record?.verse.id ?? "No verse loaded"}</h2>
+            <div className="row center-verse-nav">
+              <button onClick={() => jumpToAdjacentVerse(-1)} disabled={selectedVerseIndex <= 0}>
+                Previous verse
+              </button>
+              <button
+                onClick={() => jumpToAdjacentVerse(1)}
+                disabled={selectedVerseIndex < 0 || selectedVerseIndex >= sortedVerseRefs.length - 1}
+              >
+                Next verse
+              </button>
+            </div>
+          </div>
           <div className="row">
             <button className="primary" onClick={runTranspose}>Transpose</button>
             <button onClick={undo}>Undo (U)</button>
@@ -456,50 +540,122 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="panel">
-        <h3>Selected Ta’am</h3>
+      <section className="panel right-panel">
+        <h3 className="section-title">Selected Ta’am</h3>
         {selectedTaam ? (
-          <>
+          <div className="selected-taam-card">
             <div>{selectedTaam.name}</div>
             <div className="small">
               token {selectedTaam.position.tokenIndex}, letter {selectedTaam.position.letterIndex}, confidence {(selectedTaam.confidence * 100).toFixed(0)}%
             </div>
-          </>
+          </div>
         ) : (
           <div className="small">Select a ta’am badge</div>
         )}
 
-        <div className="row" style={{ marginTop: 8 }}>
-          <button onClick={() => void moveSelected(-1, 0)}>[ prev word</button>
-          <button onClick={() => void moveSelected(1, 0)}>] next word</button>
-          <button onClick={() => void moveSelected(0, -1)}>, prev letter</button>
-          <button onClick={() => void moveSelected(0, 1)}>. next letter</button>
-          <button onClick={replaceSelected}>R replace</button>
-          <button onClick={deleteSelected}>D delete</button>
-          <button onClick={addAtCursor}>A add</button>
+        <div className="small action-label">Navigate placement</div>
+        <div className="row action-row">
+          <button className="subtle" onClick={() => void moveSelected(-1, 0)}>[ prev word</button>
+          <button className="subtle" onClick={() => void moveSelected(1, 0)}>] next word</button>
+          <button className="subtle" onClick={() => void moveSelected(0, -1)}>, prev letter</button>
+          <button className="subtle" onClick={() => void moveSelected(0, 1)}>. next letter</button>
         </div>
 
-        <h3>Low-Confidence Queue</h3>
+        <div className="small action-label">Edit placement</div>
+        <div className="row action-row">
+          <button className="primary" onClick={replaceSelected}>R replace</button>
+          <button className="danger" onClick={deleteSelected}>D delete</button>
+          <button className="primary" onClick={addAtCursor}>A add</button>
+        </div>
+
+        <h3 className="section-title">Low-Confidence Queue</h3>
         <div className="small">{lowConfidence.length} placements</div>
         {lowConfidence.map((t) => (
-          <div key={`low-${t.taamId}`} className="verse-item" onClick={() => setSelectedTaamId(t.taamId)}>
+          <div
+            key={`low-${t.taamId}`}
+            className={`verse-item queue-item ${selectedTaamId === t.taamId ? "active" : ""}`}
+            onClick={() => setSelectedTaamId(t.taamId)}
+          >
             {t.unicodeMark} {t.name} @ {t.position.tokenIndex}:{t.position.letterIndex} ({(t.confidence * 100).toFixed(0)}%)
           </div>
         ))}
 
-        <h3>Manuscript Notes</h3>
+        <h3 className="section-title">Manuscript Notes</h3>
         <textarea value={notes} onChange={(e) => setNotes(e.target.value)} />
         <div className="row" style={{ marginTop: 8 }}>
           <button onClick={() => saveVerification(false)}>Save Note</button>
           <button className="primary" onClick={() => saveVerification(true)}>Mark Verified</button>
         </div>
 
-        <h3>Patch History</h3>
+        <h3 className="section-title">Patch History</h3>
         {(record?.patches ?? []).map((p) => (
           <div key={p.id} className="small">
             #{p.seqNo} {p.op.type} {p.note ?? ""}
           </div>
         ))}
+      </section>
+
+      <section className={`import-drawer ${importOpen ? "open" : ""}`}>
+        <button className="import-toggle" onClick={() => setImportOpen((open) => !open)}>
+          <span>Import</span>
+          <span aria-hidden="true">{importOpen ? "v" : "^"}</span>
+        </button>
+        <div className="import-content">
+          <h3>Import</h3>
+          <div className="row">
+            <button className={importMode === "single" ? "primary" : ""} onClick={() => setImportMode("single")}>Single passuk</button>
+            <button className={importMode === "chapter" ? "primary" : ""} onClick={() => setImportMode("chapter")}>Chapter TSV</button>
+          </div>
+          <div style={{ marginTop: 8 }}>
+            <label className="small">Target</label>
+            <select value={importTarget} onChange={(e) => setImportTarget(e.target.value as "hebrew" | "targum" | "both")}>
+              <option value="both">Hebrew + Targum</option>
+              <option value="hebrew">Hebrew only</option>
+              <option value="targum">Targum only</option>
+            </select>
+          </div>
+
+          {importMode === "single" ? (
+            <>
+              <label className="small" style={{ marginTop: 8 }}>Verse ID</label>
+              <input value={singleVerseId} onChange={(e) => setSingleVerseId(e.target.value)} placeholder="Genesis:1:1" />
+              {importTarget !== "targum" ? (
+                <>
+                  <label className="small" style={{ marginTop: 8 }}>Hebrew text</label>
+                  <textarea value={singleHebrew} onChange={(e) => setSingleHebrew(e.target.value)} />
+                </>
+              ) : null}
+              {importTarget !== "hebrew" ? (
+                <>
+                  <label className="small" style={{ marginTop: 8 }}>Targum text</label>
+                  <textarea value={singleTargum} onChange={(e) => setSingleTargum(e.target.value)} />
+                </>
+              ) : null}
+            </>
+          ) : (
+            <>
+              {importTarget !== "targum" ? (
+                <>
+                  <label className="small" style={{ marginTop: 8 }}>Hebrew TSV</label>
+                  <input type="file" accept=".tsv,text/tab-separated-values,text/plain" onChange={(e) => setChapterHebrewFile(e.target.files?.[0] ?? null)} />
+                </>
+              ) : null}
+              {importTarget !== "hebrew" ? (
+                <>
+                  <label className="small" style={{ marginTop: 8 }}>Targum TSV</label>
+                  <input type="file" accept=".tsv,text/tab-separated-values,text/plain" onChange={(e) => setChapterTargumFile(e.target.files?.[0] ?? null)} />
+                </>
+              ) : null}
+            </>
+          )}
+
+          <div className="row" style={{ marginTop: 8 }}>
+            <button className="primary" onClick={runImport} disabled={importBusy}>
+              {importBusy ? "Importing..." : "Import"}
+            </button>
+          </div>
+          {importMessage ? <div className="small" style={{ marginTop: 6 }}>{importMessage}</div> : null}
+        </div>
       </section>
     </main>
   );
