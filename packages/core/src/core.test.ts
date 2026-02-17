@@ -56,4 +56,11 @@ describe("core parser and transposer", () => {
     expect(editedA).toEqual(editedB);
     expect(editedA[0].position.tokenIndex).toBe(1);
   });
+
+  it("does not crash when Hebrew disjunctive segmentation exceeds Aramaic token count", () => {
+    const verse = parseVerse("Genesis:1:1", "א֑ ב֑ ג֑ ד׃", "א", taamMap);
+    const generated = transposeTaamim(verse.hebrewTokens, verse.aramaicTokens, config);
+    expect(generated.length).toBeGreaterThan(0);
+    expect(generated.every((item) => item.position.tokenIndex === 0)).toBe(true);
+  });
 });

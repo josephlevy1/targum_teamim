@@ -90,10 +90,10 @@ export function allocateAramaicSegments(arTokenCount: number, heSegments: Segmen
   const arSegments: Segment[] = [];
   let cursor = 0;
   for (const count of allocation) {
-    const start = cursor;
+    const start = clamp(cursor, 0, Math.max(0, arTokenCount - 1));
     const end = clamp(cursor + count, start + 1, arTokenCount);
     arSegments.push({ start, end });
-    cursor = end;
+    cursor = Math.min(arTokenCount, cursor + count);
   }
   if (arSegments.length > 0) {
     arSegments[arSegments.length - 1].end = arTokenCount;
@@ -174,6 +174,7 @@ export function transposeTaamim(
 
   const heSegments = segmentHebrewByDisjunctives(heEvents, config, hebrewTokens.length);
   const arSegments = allocateAramaicSegments(aramaicTokens.length, heSegments, hebrewTokens.length);
+  const lastArToken = aramaicTokens.length - 1;
 
   const output: GeneratedTaam[] = [];
 
@@ -207,7 +208,7 @@ export function transposeTaamim(
       const arSegWords = Math.max(1, arSeg.end - arSeg.start);
       const rel = (event.hebAnchor.tokenIndex - heSeg.start + 1) / heSegWords;
       const mappedOffset = clamp(Math.round(rel * arSegWords) - 1, 0, arSegWords - 1);
-      const mappedToken = clamp(arSeg.start + mappedOffset, arSeg.start, Math.max(arSeg.start, arSeg.end - 1));
+      const mappedToken = clamp(arSeg.start + mappedOffset, 0, lastArToken);
 
       const conf = scoreConfidence(
         heSegWords,

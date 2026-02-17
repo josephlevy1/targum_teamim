@@ -3,6 +3,10 @@ import { getRepository } from "@/lib/repository";
 
 export async function POST(_: Request, ctx: { params: Promise<{ verseId: string }> }) {
   const { verseId } = await ctx.params;
-  const cursor = getRepository().redo(verseId as any);
+  const repo = getRepository();
+  if (!repo.getVerseRecord(verseId as any)) {
+    return NextResponse.json({ error: "Verse not found" }, { status: 404 });
+  }
+  const cursor = repo.redo(verseId as any);
   return NextResponse.json({ patchCursor: cursor });
 }

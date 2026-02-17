@@ -90,6 +90,7 @@ export class TargumRepository {
       );
 
       CREATE INDEX IF NOT EXISTS idx_patches_verse_seq ON patches(verse_id, seq_no);
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_patches_verse_seq_unique ON patches(verse_id, seq_no);
     `);
 
     const verseStateColumns = this.db
@@ -171,34 +172,36 @@ export class TargumRepository {
     this.writeVerseMirror(verseId);
   }
 
-  private nextSeqNo(verseId: VerseId): number {
-    const row = this.db.prepare("SELECT COALESCE(MAX(seq_no), 0) as maxSeq FROM patches WHERE verse_id = ?").get(verseId) as {
-      maxSeq: number;
-    };
-    return row.maxSeq + 1;
-  }
-
   addPatch(verseId: VerseId, op: PatchOp, note?: string): PatchEntry {
-    const entry: PatchEntry = {
-      id: crypto.randomUUID(),
-      verseId,
-      op,
-      author: this.options.author,
-      note,
-      createdAt: new Date().toISOString(),
-      seqNo: this.nextSeqNo(verseId),
-    };
+    const run = this.db.transaction((targetVerseId: VerseId, patchOp: PatchOp, patchNote?: string): PatchEntry => {
+      const row = this.db
+        .prepare("SELECT COALESCE(MAX(seq_no), 0) as maxSeq FROM patches WHERE verse_id = ?")
+        .get(targetVerseId) as { maxSeq: number };
+      const now = new Date().toISOString();
+      const entry: PatchEntry = {
+        id: crypto.randomUUID(),
+        verseId: targetVerseId,
+        op: patchOp,
+        author: this.options.author,
+        note: patchNote,
+        createdAt: now,
+        seqNo: row.maxSeq + 1,
+      };
 
-    this.db
-      .prepare(
-        `INSERT INTO patches (id, verse_id, op_json, author, note, created_at, seq_no)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      )
-      .run(entry.id, entry.verseId, JSON.stringify(entry.op), entry.author, entry.note ?? null, entry.createdAt, entry.seqNo);
+      this.db
+        .prepare(
+          `INSERT INTO patches (id, verse_id, op_json, author, note, created_at, seq_no)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .run(entry.id, entry.verseId, JSON.stringify(entry.op), entry.author, entry.note ?? null, entry.createdAt, entry.seqNo);
 
-    this.db
-      .prepare("UPDATE verse_state SET patch_cursor = ?, updated_at = ? WHERE verse_id = ?")
-      .run(entry.seqNo, new Date().toISOString(), verseId);
+      this.db
+        .prepare("UPDATE verse_state SET patch_cursor = ?, updated_at = ? WHERE verse_id = ?")
+        .run(entry.seqNo, now, targetVerseId);
+      return entry;
+    });
+
+    const entry = run(verseId, op, note);
 
     this.writePatchMirror(verseId);
     this.writeVerseMirror(verseId);
