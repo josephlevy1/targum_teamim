@@ -112,6 +112,7 @@ function parseVerseId(id: string): ParsedVerseRef | null {
 
 export default function HomePage() {
   const searchParams = useSearchParams();
+  const modeParam = searchParams.get("mode") ?? "";
   const loadVerseRequestSeq = useRef(0);
   const [verseItems, setVerseItems] = useState<Array<{ verseId: string; verified: boolean; flagged: boolean; avgConfidence: number }>>([]);
   const [verseId, setVerseId] = useState<string>("");
@@ -139,7 +140,7 @@ export default function HomePage() {
   const [transposeConfirmMode, setTransposeConfirmMode] = useState(false);
   const [exportBusy, setExportBusy] = useState(false);
   const [exportMessage, setExportMessage] = useState("");
-  const [exportOpen, setExportOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(modeParam === "export");
   const [exportActiveAction, setExportActiveAction] = useState<"verse" | "chapter" | "book" | "all" | null>(null);
 
   const selectedTaam = useMemo(() => record?.edited.find((t) => t.taamId === selectedTaamId) ?? null, [record, selectedTaamId]);
@@ -757,6 +758,12 @@ export default function HomePage() {
   }, [selectedTaamId, verseId]);
 
   useEffect(() => {
+    if (modeParam === "export") {
+      setExportOpen(true);
+    }
+  }, [modeParam]);
+
+  useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (!record) return;
       if (e.key === "[") {
@@ -787,6 +794,14 @@ export default function HomePage() {
         e.preventDefault();
         beginAdd();
       }
+      if (e.key.toLowerCase() === "p") {
+        e.preventDefault();
+        jumpToAdjacentVerse(-1);
+      }
+      if (e.key.toLowerCase() === "n") {
+        e.preventDefault();
+        jumpToAdjacentVerse(1);
+      }
       if (e.key.toLowerCase() === "u" && e.shiftKey) {
         e.preventDefault();
         void redo();
@@ -806,17 +821,6 @@ export default function HomePage() {
       <section className="panel left-panel">
         <div className="left-scroll nav-scroll">
           <h3>Verse Navigator</h3>
-          <div className="row left-nav-actions">
-            <button onClick={() => jumpToAdjacentVerse(-1)} disabled={selectedVerseIndex <= 0}>
-              Previous verse
-            </button>
-            <button
-              onClick={() => jumpToAdjacentVerse(1)}
-              disabled={selectedVerseIndex < 0 || selectedVerseIndex >= sortedVerseRefs.length - 1}
-            >
-              Next verse
-            </button>
-          </div>
           <label className="small" style={{ marginTop: 8 }}>Book</label>
           <select
             value={selectedBook}
@@ -976,14 +980,15 @@ export default function HomePage() {
           })}
         </div>
         <div className="row center-verse-nav">
-          <button onClick={() => jumpToAdjacentVerse(-1)} disabled={selectedVerseIndex <= 0}>
-            Previous verse
+          <button className="shortcut-btn" onClick={() => jumpToAdjacentVerse(-1)} disabled={selectedVerseIndex <= 0}>
+            Previous verse <span className="kbd-hint">P</span>
           </button>
           <button
+            className="shortcut-btn"
             onClick={() => jumpToAdjacentVerse(1)}
             disabled={selectedVerseIndex < 0 || selectedVerseIndex >= sortedVerseRefs.length - 1}
           >
-            Next verse
+            Next verse <span className="kbd-hint">N</span>
           </button>
         </div>
       </section>

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { sanitizeFileNamePart } from "@/lib/export-ranges";
 
 type ReadingVerse = {
   verseId: string;
@@ -27,6 +28,10 @@ export default function ReadingPage() {
   const [selectedVerseId, setSelectedVerseId] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [exportOpen, setExportOpen] = useState(false);
+  const [exportBusy, setExportBusy] = useState(false);
+  const [exportMessage, setExportMessage] = useState("");
+  const [exportActiveAction, setExportActiveAction] = useState<"verse" | "chapter" | "all" | null>(null);
 
   const selectedBook = searchParams.get("book") ?? "";
   const selectedChapterRaw = Number(searchParams.get("chapter"));
@@ -126,6 +131,11 @@ export default function ReadingPage() {
     });
   }
 
+  const orderedVerses = useMemo(
+    () => [...(payload?.verses ?? [])].sort((a, b) => a.verseNumber - b.verseNumber),
+    [payload?.verses],
+  );
+
   function buildEditHref(targetVerseId: string, useReturnVerse: boolean): string {
     const params = new URLSearchParams();
     params.set("verseId", useReturnVerse && returnVerseId ? returnVerseId : targetVerseId);
@@ -136,12 +146,124 @@ export default function ReadingPage() {
     return `/?${params.toString()}`;
   }
 
+  function buildExportUnicodeUrl(start: string, end: string): string {
+    const rawRange = `${start}-${end}`;
+    return `/api/export/unicode?range=${encodeURIComponent(rawRange)}`;
+  }
+
+  function triggerDownload(blob: Blob, filename: string) {
+    const objectUrl = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = objectUrl;
+    anchor.download = filename;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(objectUrl);
+  }
+
+  async function downloadText(scope: "verse" | "chapter", filename: string, url: string): Promise<void> {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Failed to export ${scope} text.`);
+    }
+    const text = await response.text();
+    triggerDownload(new Blob([text], { type: "text/plain; charset=utf-8" }), filename);
+  }
+
+  async function downloadJson(filename: string, url: string): Promise<void> {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error("Failed to export JSON.");
+    }
+    const exportPayload = (await response.json()) as { data?: unknown };
+    const json = `${JSON.stringify(exportPayload.data ?? exportPayload, null, 2)}\n`;
+    triggerDownload(new Blob([json], { type: "application/json; charset=utf-8" }), filename);
+  }
+
+  async function runExport(action: "verse" | "chapter" | "all") {
+    setExportMessage("Exporting...");
+    setExportBusy(true);
+    setExportActiveAction(action);
+
+    try {
+      if (action === "all") {
+        await downloadJson("targum_all.json", "/api/export/json");
+        setExportMessage("Downloaded targum_all.json");
+        return;
+      }
+
+      if (action === "verse") {
+        const verse = selectedVerse ?? orderedVerses[0];
+        if (!verse || !payload?.selectedBook || !payload.selectedChapter) {
+          throw new Error("Select a verse to export.");
+        }
+        const file = `${sanitizeFileNamePart(payload.selectedBook)}_ch${payload.selectedChapter}_v${verse.verseNumber}.txt`;
+        await downloadText("verse", file, buildExportUnicodeUrl(verse.verseId, verse.verseId));
+        setExportMessage(`Downloaded ${file}`);
+        return;
+      }
+
+      const first = orderedVerses[0];
+      const last = orderedVerses[orderedVerses.length - 1];
+      if (!first || !last || !payload?.selectedBook || !payload.selectedChapter) {
+        throw new Error("Select a chapter to export.");
+      }
+      const file = `${sanitizeFileNamePart(payload.selectedBook)}_ch${payload.selectedChapter}.txt`;
+      await downloadText("chapter", file, buildExportUnicodeUrl(first.verseId, last.verseId));
+      setExportMessage(`Downloaded ${file}`);
+    } catch (exportError) {
+      setExportMessage(exportError instanceof Error ? exportError.message : "Export failed.");
+    } finally {
+      setExportBusy(false);
+      setExportActiveAction(null);
+    }
+  }
+
   return (
     <main className="reading-main">
       <section className="panel reading-controls">
         <div className="reading-controls-header">
-          <h2>Reading Review</h2>
+          <div className="reading-controls-title-row">
+            <h2>Reading Review</h2>
+            <button
+              type="button"
+              className="reading-edit-btn"
+              aria-expanded={exportOpen}
+              onClick={() => setExportOpen((open) => !open)}
+            >
+              Export
+            </button>
+          </div>
           <div className="small">Chapter review with verse actions</div>
+          {exportOpen ? (
+            <div className="reading-export-panel">
+              <div className="row reading-export-actions">
+                <button
+                  className={exportActiveAction === "verse" ? "primary" : ""}
+                  onClick={() => void runExport("verse")}
+                  disabled={exportBusy || orderedVerses.length === 0}
+                >
+                  Verse (.txt)
+                </button>
+                <button
+                  className={exportActiveAction === "chapter" ? "primary" : ""}
+                  onClick={() => void runExport("chapter")}
+                  disabled={exportBusy || orderedVerses.length === 0}
+                >
+                  Chapter (.txt)
+                </button>
+                <button
+                  className={exportActiveAction === "all" ? "primary" : ""}
+                  onClick={() => void runExport("all")}
+                  disabled={exportBusy}
+                >
+                  All (.json)
+                </button>
+              </div>
+              {exportMessage ? <div className="small reading-export-message">{exportMessage}</div> : null}
+            </div>
+          ) : null}
         </div>
         <div className="reading-controls-row reading-controls-toolbar">
           <div className="reading-field">

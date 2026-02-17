@@ -559,6 +559,30 @@ button.destructive:focus-visible {
   margin: 0;
 }
 
+.reading-controls-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.reading-export-panel {
+  margin-top: 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel);
+  padding: 0.65rem;
+}
+
+.reading-export-actions {
+  justify-content: flex-end;
+}
+
+.reading-export-message {
+  margin-top: 6px;
+  text-align: right;
+}
+
 .reading-controls-row {
   display: flex;
   gap: 0.6rem;
