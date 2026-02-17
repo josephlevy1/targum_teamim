@@ -112,6 +112,7 @@ export interface PatchEntry {
 
 export interface VerseState {
   verified: boolean;
+  flagged: boolean;
   manuscriptNotes: string;
   patchCursor: number;
 }

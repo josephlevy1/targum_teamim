@@ -91,6 +91,14 @@ export class TargumRepository {
 
       CREATE INDEX IF NOT EXISTS idx_patches_verse_seq ON patches(verse_id, seq_no);
     `);
+
+    const verseStateColumns = this.db
+      .prepare("PRAGMA table_info(verse_state)")
+      .all() as Array<{ name: string }>;
+
+    if (!verseStateColumns.some((column) => column.name === "flagged")) {
+      this.db.exec("ALTER TABLE verse_state ADD COLUMN flagged INTEGER NOT NULL DEFAULT 0");
+    }
   }
 
   close(): void {
@@ -127,8 +135,8 @@ export class TargumRepository {
 
     this.db
       .prepare(
-        `INSERT INTO verse_state (verse_id, verified, manuscript_notes, patch_cursor, updated_at)
-         VALUES (?, 0, '', 0, ?)
+        `INSERT INTO verse_state (verse_id, verified, flagged, manuscript_notes, patch_cursor, updated_at)
+         VALUES (?, 0, 0, '', 0, ?)
          ON CONFLICT(verse_id) DO NOTHING`,
       )
       .run(verse.id, now);
@@ -205,6 +213,14 @@ export class TargumRepository {
     this.writeVerseMirror(verseId);
   }
 
+  setFlagged(verseId: VerseId, flagged: boolean): void {
+    this.db
+      .prepare("UPDATE verse_state SET flagged = ?, updated_at = ? WHERE verse_id = ?")
+      .run(flagged ? 1 : 0, new Date().toISOString(), verseId);
+
+    this.writeVerseMirror(verseId);
+  }
+
   getVerseRecord(verseId: VerseId): VerseRecord | null {
     const verseRow = this.db
       .prepare("SELECT hebrew_json, aramaic_json FROM verses WHERE verse_id = ?")
@@ -230,8 +246,8 @@ export class TargumRepository {
     }>;
 
     const stateRow = this.db
-      .prepare("SELECT verified, manuscript_notes, patch_cursor FROM verse_state WHERE verse_id = ?")
-      .get(verseId) as { verified: number; manuscript_notes: string; patch_cursor: number } | undefined;
+      .prepare("SELECT verified, flagged, manuscript_notes, patch_cursor FROM verse_state WHERE verse_id = ?")
+      .get(verseId) as { verified: number; flagged: number; manuscript_notes: string; patch_cursor: number } | undefined;
 
     const verse: Verse = {
       id: verseId,
@@ -253,6 +269,7 @@ export class TargumRepository {
 
     const state: VerseState = {
       verified: Boolean(stateRow?.verified ?? 0),
+      flagged: Boolean(stateRow?.flagged ?? 0),
       manuscriptNotes: stateRow?.manuscript_notes ?? "",
       patchCursor: stateRow?.patch_cursor ?? 0,
     };

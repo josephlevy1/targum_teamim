@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { bookRange, chapterRange, sanitizeFileNamePart, verseRange, type ExportRange } from "@/lib/export-ranges";
 
 type Tier = "DISJUNCTIVE" | "CONJUNCTIVE" | "METEG_LIKE" | "PISUQ";
@@ -25,7 +26,7 @@ type VerseRecord = {
   generated: GeneratedTaam[];
   edited: GeneratedTaam[];
   patches: Array<{ id: string; seqNo: number; op: { type: string }; note?: string; createdAt: string }>;
-  state: { verified: boolean; manuscriptNotes: string; patchCursor: number };
+  state: { verified: boolean; flagged: boolean; manuscriptNotes: string; patchCursor: number };
 };
 
 type ParsedVerseRef = {
@@ -110,8 +111,11 @@ function parseVerseId(id: string): ParsedVerseRef | null {
 }
 
 export default function HomePage() {
+  const searchParams = useSearchParams();
+  const loadVerseRequestSeq = useRef(0);
   const [verseItems, setVerseItems] = useState<Array<{ verseId: string; verified: boolean; avgConfidence: number }>>([]);
   const [verseId, setVerseId] = useState<string>("");
+  const [didHydrateFromQuery, setDidHydrateFromQuery] = useState(false);
   const [verseSortMode, setVerseSortMode] = useState<VerseSortMode>("sequential");
   const [verseFilterMode, setVerseFilterMode] = useState<VerseFilterMode>("all");
   const [record, setRecord] = useState<VerseRecord | null>(null);
@@ -139,6 +143,11 @@ export default function HomePage() {
   const [exportActiveAction, setExportActiveAction] = useState<"verse" | "chapter" | "book" | "all" | null>(null);
 
   const selectedTaam = useMemo(() => record?.edited.find((t) => t.taamId === selectedTaamId) ?? null, [record, selectedTaamId]);
+  const queryVerseId = searchParams.get("verseId")?.trim() ?? "";
+  const fromMode = searchParams.get("from") ?? "";
+  const readingBookParam = searchParams.get("book") ?? "";
+  const readingChapterParam = Number(searchParams.get("chapter"));
+  const readingVerseParam = searchParams.get("verse") ?? "";
   const selectedTaamToken = useMemo(
     () => (selectedTaam ? record?.verse.aramaicTokens[selectedTaam.position.tokenIndex] ?? null : null),
     [record, selectedTaam],
@@ -190,6 +199,34 @@ export default function HomePage() {
     [sortedVerseRefs],
   );
   const selectedVerseRef = useMemo(() => parseVerseId(verseId), [verseId]);
+  const readingModeHref = useMemo(() => {
+    const params = new URLSearchParams();
+    if (selectedVerseRef) {
+      params.set("book", selectedVerseRef.book);
+      params.set("chapter", String(selectedVerseRef.chapter));
+      params.set("verse", selectedVerseRef.id);
+      params.set("returnVerseId", selectedVerseRef.id);
+    }
+    params.set("from", "edit");
+    const query = params.toString();
+    return query ? `/reading?${query}` : "/reading";
+  }, [selectedVerseRef]);
+  const backToReadingHref = useMemo(() => {
+    if (fromMode !== "reading") return "";
+    const params = new URLSearchParams();
+    const fallbackRef = selectedVerseRef;
+    const nextBook = readingBookParam || fallbackRef?.book || "";
+    const nextChapter = Number.isInteger(readingChapterParam) && readingChapterParam > 0
+      ? readingChapterParam
+      : (fallbackRef?.chapter ?? 0);
+    const nextVerse = readingVerseParam || verseId || fallbackRef?.id || "";
+    if (nextBook) params.set("book", nextBook);
+    if (nextChapter > 0) params.set("chapter", String(nextChapter));
+    if (nextVerse) params.set("verse", nextVerse);
+    params.set("from", "edit");
+    if (verseId) params.set("returnVerseId", verseId);
+    return `/reading?${params.toString()}`;
+  }, [fromMode, readingBookParam, readingChapterParam, readingVerseParam, selectedVerseRef, verseId]);
   const selectedBook = selectedVerseRef?.book ?? bookOptions[0] ?? "";
   const chapterOptions = useMemo(
     () =>
@@ -445,9 +482,13 @@ export default function HomePage() {
   }
 
   async function loadVerse(id: string, preferredTaamId?: string) {
+    const requestSeq = ++loadVerseRequestSeq.current;
     const res = await fetch(versePath(id));
     if (!res.ok) return;
     const json = (await res.json()) as VerseRecord;
+    if (requestSeq !== loadVerseRequestSeq.current) {
+      return;
+    }
     setRecord(json);
     setActiveToken(null);
     setSelectedTaamId((current) => {
@@ -672,6 +713,19 @@ export default function HomePage() {
   useEffect(() => {
     void refreshVerses();
   }, []);
+
+  useEffect(() => {
+    if (didHydrateFromQuery) return;
+    if (!queryVerseId) {
+      setDidHydrateFromQuery(true);
+      return;
+    }
+    if (verseItems.length === 0) return;
+    if (verseItems.some((item) => item.verseId === queryVerseId)) {
+      setVerseId(queryVerseId);
+    }
+    setDidHydrateFromQuery(true);
+  }, [didHydrateFromQuery, queryVerseId, verseItems]);
 
   useEffect(() => {
     if (verseId) {
@@ -1085,6 +1139,12 @@ export default function HomePage() {
           </div>
           {importMessage ? <div className="small" style={{ marginTop: 6 }}>{importMessage}</div> : null}
         </div>
+      </section>
+
+      <section className="reading-drawer">
+        <a className="bottom-reading-btn" href={backToReadingHref || readingModeHref}>
+          Reading Mode
+        </a>
       </section>
 
       <section className={`export-drawer ${exportOpen ? "open" : ""}`}>
