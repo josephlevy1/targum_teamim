@@ -46,3 +46,14 @@ pnpm typecheck
 pnpm test
 pnpm build
 ```
+
+## taam.im deployment
+
+For isolated self-hosting on `taam.im` (without touching `josephalevy.com`):
+
+```bash
+pnpm deploy:taam:setup
+pnpm deploy:taam:check
+```
+
+Detailed runbook: `docs/deploy-taam-im.md`

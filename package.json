@@ -13,6 +13,8 @@
     "stop:prod": "bash scripts/stop.sh",
     "backup": "bash scripts/backup-db.sh",
     "pm2:status": "pm2 list",
-    "pm2:logs": "pm2 logs"
+    "pm2:logs": "pm2 logs",
+    "deploy:taam:setup": "bash scripts/setup-cloudflared-taam.sh --hostname taam.im --with-www --install-service",
+    "deploy:taam:check": "bash scripts/check-taam-deploy.sh taam.im"
   }
 }
