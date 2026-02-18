@@ -49,7 +49,7 @@ pnpm build
 
 ## taam.im deployment
 
-For isolated self-hosting on `taam.im` (without touching `josephalevy.com`):
+For isolated self-hosting on `taam.im` (without touching any other hosted sites):
 
 ```bash
 pnpm deploy:taam:setup
