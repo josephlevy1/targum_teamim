@@ -832,7 +832,7 @@ function HomePageInner() {
       <section className="panel left-panel">
         <div className="left-scroll nav-scroll">
           <h3>Verse Navigator</h3>
-          <label className="small" style={{ marginTop: 8 }}>Book</label>
+          <label className="small field-label">Book</label>
           <select
             value={selectedBook}
             onChange={(e) => {
@@ -847,7 +847,7 @@ function HomePageInner() {
               </option>
             ))}
           </select>
-          <label className="small" style={{ marginTop: 8 }}>Chapter</label>
+          <label className="small field-label">Chapter</label>
           <select
             value={selectedChapter || ""}
             onChange={(e) => {
@@ -862,7 +862,7 @@ function HomePageInner() {
               </option>
             ))}
           </select>
-          <label className="small" style={{ marginTop: 8 }}>Verse</label>
+          <label className="small field-label">Verse</label>
           <select value={verseId} onChange={(e) => setVerseId(e.target.value)}>
             {verseOptions.map((ref) => (
               <option key={ref.id} value={ref.id}>
@@ -870,16 +870,16 @@ function HomePageInner() {
               </option>
             ))}
           </select>
-          <div className="small nav-meta" style={{ marginTop: 6 }}>
+          <div className="small nav-meta compact-top">
             {sortedVerseRefs.length} structured verse IDs loaded
           </div>
-          <label className="small" style={{ marginTop: 8 }}>Sort by</label>
+          <label className="small field-label">Sort by</label>
           <select value={verseSortMode} onChange={(e) => setVerseSortMode(e.target.value as VerseSortMode)}>
             <option value="sequential">Sequential</option>
             <option value="confidence_desc">Confidence Level (descending)</option>
             <option value="confidence_asc">Confidence Level (ascending)</option>
           </select>
-          <div className="small nav-meta" style={{ marginTop: 8 }}>Filter</div>
+          <div className="small nav-meta field-label">Filter</div>
           <div className="row nav-filter-row">
             <button
               className={`subtle nav-filter-btn ${verseFilterMode === "all" ? "active" : ""}`}
@@ -906,7 +906,7 @@ function HomePageInner() {
               Flagged
             </button>
           </div>
-          <div className="small nav-meta" style={{ marginTop: 6 }}>
+          <div className="small nav-meta compact-top">
             {verseFilterMode === "flagged"
               ? `Showing ${visibleVerseItems.length} of ${filteredVerseCount}`
               : `Showing top ${visibleVerseItems.length} of ${filteredVerseCount}`}
@@ -1103,7 +1103,7 @@ function HomePageInner() {
 
             <h3 className="section-title">Notes</h3>
             <textarea value={notes} onChange={(e) => setNotes(e.target.value)} />
-            <div className="row" style={{ marginTop: 8 }}>
+            <div className="row section-top">
               <button onClick={() => saveVerification(false)}>Save Note</button>
             </div>
 
@@ -1139,7 +1139,7 @@ function HomePageInner() {
             <button className={importMode === "single" ? "primary" : ""} onClick={() => setImportMode("single")}>Single passuk</button>
             <button className={importMode === "chapter" ? "primary" : ""} onClick={() => setImportMode("chapter")}>Chapter TSV</button>
           </div>
-          <div style={{ marginTop: 8 }}>
+          <div className="section-top">
             <label className="small">Target</label>
             <select value={importTarget} onChange={(e) => setImportTarget(e.target.value as "hebrew" | "targum" | "both")}>
               <option value="both">Hebrew + Targum</option>
@@ -1150,17 +1150,17 @@ function HomePageInner() {
 
           {importMode === "single" ? (
             <>
-              <label className="small" style={{ marginTop: 8 }}>Verse ID</label>
+              <label className="small field-label">Verse ID</label>
               <input value={singleVerseId} onChange={(e) => setSingleVerseId(e.target.value)} placeholder="Genesis:1:1" />
               {importTarget !== "targum" ? (
                 <>
-                  <label className="small" style={{ marginTop: 8 }}>Hebrew text</label>
+                  <label className="small field-label">Hebrew text</label>
                   <textarea value={singleHebrew} onChange={(e) => setSingleHebrew(e.target.value)} />
                 </>
               ) : null}
               {importTarget !== "hebrew" ? (
                 <>
-                  <label className="small" style={{ marginTop: 8 }}>Targum text</label>
+                  <label className="small field-label">Targum text</label>
                   <textarea value={singleTargum} onChange={(e) => setSingleTargum(e.target.value)} />
                 </>
               ) : null}
@@ -1169,25 +1169,25 @@ function HomePageInner() {
             <>
               {importTarget !== "targum" ? (
                 <>
-                  <label className="small" style={{ marginTop: 8 }}>Hebrew TSV</label>
+                  <label className="small field-label">Hebrew TSV</label>
                   <input type="file" accept=".tsv,text/tab-separated-values,text/plain" onChange={(e) => setChapterHebrewFile(e.target.files?.[0] ?? null)} />
                 </>
               ) : null}
               {importTarget !== "hebrew" ? (
                 <>
-                  <label className="small" style={{ marginTop: 8 }}>Targum TSV</label>
+                  <label className="small field-label">Targum TSV</label>
                   <input type="file" accept=".tsv,text/tab-separated-values,text/plain" onChange={(e) => setChapterTargumFile(e.target.files?.[0] ?? null)} />
                 </>
               ) : null}
             </>
           )}
 
-          <div className="row" style={{ marginTop: 8 }}>
+          <div className="row section-top">
             <button className="primary" onClick={runImport} disabled={importBusy}>
               {importBusy ? "Importing..." : "Import"}
             </button>
           </div>
-          {importMessage ? <div className="small" style={{ marginTop: 6 }}>{importMessage}</div> : null}
+          {importMessage ? <div className="small compact-top">{importMessage}</div> : null}
         </div>
       </section>
 
@@ -1205,7 +1205,7 @@ function HomePageInner() {
         <div className="export-content">
           <h3>Export</h3>
           <div className="small">Rendered Targum text for scoped exports</div>
-          <div className="row" style={{ marginTop: 8 }}>
+          <div className="row section-top">
             <button
               className={exportActiveAction === "verse" ? "primary" : ""}
               onClick={() => void runExport("verse")}
@@ -1235,7 +1235,7 @@ function HomePageInner() {
               All (.json)
             </button>
           </div>
-          {exportMessage ? <div className="small" style={{ marginTop: 6 }}>{exportMessage}</div> : null}
+          {exportMessage ? <div className="small compact-top">{exportMessage}</div> : null}
         </div>
       </section>
     </main>
