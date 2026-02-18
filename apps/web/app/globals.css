@@ -178,6 +178,19 @@ h4 {
   font-size: 0.82rem;
 }
 
+.field-label {
+  display: block;
+  margin-top: 8px;
+}
+
+.section-top {
+  margin-top: 8px;
+}
+
+.compact-top {
+  margin-top: 6px;
+}
+
 .nav-meta {
   line-height: 1.2;
 }
@@ -843,6 +856,10 @@ hr {
     max-height: none;
   }
 
+  .center-verse-nav {
+    margin-top: 1rem;
+  }
+
   .center-panel,
   .right-panel,
   .reading-drawer,
@@ -878,5 +895,181 @@ hr {
     position: static;
     display: block;
     max-height: none;
+  }
+
+  .right-panel-footer {
+    position: static;
+  }
+}
+
+@media (max-width: 640px) {
+  body {
+    height: auto;
+    overflow: auto;
+  }
+
+  main,
+  .reading-main {
+    min-height: 100dvh;
+    height: auto;
+    overflow: visible;
+    padding: 0.55rem;
+    gap: 0.55rem;
+  }
+
+  .panel {
+    border-radius: 10px;
+    padding: 0.65rem;
+  }
+
+  h2 {
+    font-size: 1.1rem;
+  }
+
+  h3 {
+    font-size: 1rem;
+  }
+
+  button,
+  .footer-link-btn,
+  .reading-link-btn {
+    font-size: 0.8rem;
+    padding: 0.4rem 0.5rem;
+  }
+
+  .row,
+  .center-toolbar,
+  .reading-controls-row,
+  .reading-controls-toolbar,
+  .right-panel-footer,
+  .reading-verse-actions {
+    gap: 0.45rem;
+  }
+
+  .center-toolbar > .row {
+    width: 100%;
+  }
+
+  .center-toolbar > .row button {
+    flex: 1 1 auto;
+  }
+
+  .center-verse-nav {
+    margin-top: 0.75rem;
+    justify-content: stretch;
+  }
+
+  .center-verse-nav button {
+    flex: 1 1 0;
+  }
+
+  .hebrew,
+  .aramaic {
+    font-size: 1.2rem;
+    line-height: 1.6;
+  }
+
+  .token {
+    width: 100%;
+    padding: 0.35rem 0.4rem;
+  }
+
+  .badge {
+    font-size: 0.66rem;
+    padding: 0.08rem 0.3rem;
+  }
+
+  .kbd-hint {
+    font-size: 0.72em;
+    padding: 0.03rem 0.25rem;
+  }
+
+  .nav-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .right-panel-content {
+    padding: 0.6rem;
+  }
+
+  .right-panel-footer {
+    position: static;
+    padding: 0.6rem;
+    flex-wrap: wrap;
+  }
+
+  .shortcut-btn.soft-disabled::after {
+    display: none;
+  }
+
+  .reading-controls-title-row {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+
+  .reading-controls-row,
+  .reading-chapter-nav {
+    width: 100%;
+  }
+
+  .reading-chapter-nav {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    gap: 0.45rem;
+  }
+
+  .reading-chapter-nav button {
+    flex: 1 1 9rem;
+  }
+
+  .reading-verse {
+    padding: 0.55rem 0.6rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .reading-hebrew {
+    font-size: 1.3rem;
+    line-height: 1.7;
+  }
+
+  .reading-aramaic {
+    font-size: 1.22rem;
+    line-height: 1.65;
+  }
+
+  .reading-verse-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .reading-edit-btn,
+  .reading-status-btn,
+  .reading-flag-btn {
+    min-height: 2rem;
+  }
+
+  .import-content,
+  .export-content {
+    position: static;
+    left: auto;
+    right: auto;
+    bottom: auto;
+    max-height: none;
+    overflow: visible;
+    box-shadow: none;
+  }
+
+  .field-label {
+    margin-top: 0.55rem;
+  }
+
+  .section-top {
+    margin-top: 0.55rem;
+  }
+
+  .compact-top {
+    margin-top: 0.4rem;
   }
 }

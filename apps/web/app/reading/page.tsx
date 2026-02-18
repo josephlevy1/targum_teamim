@@ -306,6 +306,7 @@ function ReadingPageInner() {
           </div>
           <div className="reading-chapter-nav">
           <button
+            type="button"
             onClick={() => {
               const currentIndex = (payload?.chapters ?? []).indexOf(payload?.selectedChapter ?? 0);
               const prev = (payload?.chapters ?? [])[currentIndex - 1];
@@ -316,6 +317,7 @@ function ReadingPageInner() {
             Previous chapter
           </button>
           <button
+            type="button"
             onClick={() => {
               const currentIndex = (payload?.chapters ?? []).indexOf(payload?.selectedChapter ?? 0);
               const next = (payload?.chapters ?? [])[currentIndex + 1];
