@@ -1,60 +1,122 @@
-# Targum Ta'amim MVP
+# Targum Ta'amim
 
-Local-first Next.js + TypeScript monorepo for:
-- ingesting Hebrew Torah (with ta'amim) and Aramaic Targum base text,
-- auto-transposing ta'amim onto Aramaic,
-- verse-level editing with patch history,
-- exporting lossless JSON and Unicode text.
+Local-first TypeScript monorepo for ingesting Hebrew + Targum text, generating ta'amim placement on Aramaic, reviewing/editing at verse level, and exporting edited results.
 
-## Quick start
+## What it includes
 
-Prerequisites:
-- Node.js `22.x` (see `.nvmrc`)
+- Next.js web app for verse editing and chapter reading.
+- SQLite-backed storage (`data/app.db`) with patch history, undo/redo, verify/flag state.
+- Import tools for TSV and a full-Torah scrape pipeline.
+- Export endpoints for JSON and rendered Unicode text.
+- Optional Clerk auth: reads stay public, write actions require sign-in.
+
+## Repository layout
+
+- `apps/web`: Next.js app (`/` editor view, `/reading` reading view) + API routes + import scripts.
+- `packages/core`: parsing, transpose engine, Unicode renderer, patch operations.
+- `packages/storage`: SQLite repository implementation.
+- `config`: ta'amim map + transpose rules.
+- `data`: database and import artifacts.
+- `scripts`: production/deploy/ops shell scripts.
+
+## Prerequisites
+
+- Node.js `22.x` (`.nvmrc`)
 - pnpm `9.15.4+`
-
-Tooling setup:
 
 ```bash
 nvm install
 nvm use
 corepack enable
 corepack prepare pnpm@9.15.4 --activate
+pnpm install
 ```
 
-Run app:
+## Local development
 
 ```bash
-pnpm install
 pnpm dev
 ```
 
-## Import commands
+App runs at `http://localhost:3000`.
 
-Input format is TSV: `verse_id<TAB>text`
+## Environment
+
+Create/update `apps/web/.env`:
+
+```bash
+# Server binding
+PORT=3000
+HOSTNAME=0.0.0.0
+
+# Clerk (required for mutation APIs)
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_live_or_test_xxx
+CLERK_SECRET_KEY=sk_live_or_test_xxx
+```
+
+If Clerk keys are missing, mutation endpoints return auth-unavailable (`503`).
+
+## Data import and generation
+
+Input format: TSV with `verse_id<TAB>text` (example verse id: `Genesis:1:1`).
+
+### Import from local TSV
 
 ```bash
 pnpm --filter web import:hebrew --file=/absolute/path/hebrew.tsv
 pnpm --filter web import:targum --file=/absolute/path/targum.tsv
 pnpm --filter web transpose --range=Genesis:1:1-Genesis:1:31
+```
+
+### Full Torah pipeline
+
+```bash
+# scrape + write data/imports/hebrew_torah.tsv and targum_torah.tsv
 pnpm --filter web scrape:torah
+
+# end-to-end run with checkpointing/resume
 pnpm --filter web run:torah --resume
 ```
 
-## API routes
+Useful flags:
 
-- `POST /api/import/hebrew`
-- `POST /api/import/targum`
-- `POST /api/transpose/:verseId`
+- `--books=Genesis,Exodus`
+- `--chapters=1-3`
+- `--delay-ms=500`
+- `--retries=3`
+- `--no-cache`
+- `--force`
+
+Pipeline artifacts are saved under `data/imports/` (manifest, TSV outputs, checkpoint, cache).
+
+## HTTP API
+
+Read endpoints (public):
+
+- `GET /api/verses`
 - `GET /api/verse/:verseId`
+- `GET /api/reading?book=Genesis&chapter=1`
+- `GET /api/export/json?range=Genesis:1:1-Genesis:1:31`
+- `GET /api/export/unicode?range=Genesis:1:1-Genesis:1:31`
+
+Import endpoints:
+
+- `POST /api/import/hebrew` with `{ "content": "Genesis:1:1\t..." }`
+- `POST /api/import/targum` with `{ "content": "Genesis:1:1\t..." }`
+
+Mutation endpoints (Clerk sign-in required):
+
+- `POST /api/transpose/:verseId`
 - `POST /api/verse/:verseId/patch`
 - `POST /api/verse/:verseId/undo`
 - `POST /api/verse/:verseId/redo`
 - `POST /api/verse/:verseId/reset`
 - `POST /api/verse/:verseId/verify`
-- `GET /api/export/json?range=...`
-- `GET /api/export/unicode?range=...`
+- `POST /api/verse/:verseId/flag`
 
-## Validation
+When signed out, mutation routes return `401`. Patch entries are attributed to Clerk username (fallback to email local-part, then user-id prefix).
+
+## Quality checks
 
 ```bash
 pnpm typecheck
@@ -62,29 +124,23 @@ pnpm test
 pnpm build
 ```
 
-## taam.im deployment
+## Production / taam.im
 
-For isolated self-hosting on `taam.im` (without touching any other hosted sites):
+```bash
+pnpm start:prod
+pnpm stop:prod
+pnpm backup
+```
+
+Cloudflare tunnel + uptime checks:
 
 ```bash
 pnpm deploy:taam:setup
 pnpm deploy:taam:check
+pnpm pm2:startup:setup
 ```
 
-Detailed runbook: `docs/deploy-taam-im.md`
+Runbooks:
 
-## Authentication (Clerk)
-
-Issue #2 uses Clerk for login/session handling.
-
-Required environment variables in `apps/web/.env`:
-
-```bash
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_live_or_test_xxx
-CLERK_SECRET_KEY=sk_live_or_test_xxx
-```
-
-Behavior:
-- read routes/pages remain public,
-- verse mutation routes require login and return `401` when signed out,
-- patch history stores the signed-in Clerk username (with fallback to email local-part, then user id prefix).
+- `docs/issue-1-mac-mini-uptime.md`
+- `docs/next-steps-issue2.md`
