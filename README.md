@@ -8,6 +8,21 @@ Local-first Next.js + TypeScript monorepo for:
 
 ## Quick start
 
+Prerequisites:
+- Node.js `22.x` (see `.nvmrc`)
+- pnpm `9.15.4+`
+
+Tooling setup:
+
+```bash
+nvm install
+nvm use
+corepack enable
+corepack prepare pnpm@9.15.4 --activate
+```
+
+Run app:
+
 ```bash
 pnpm install
 pnpm dev
