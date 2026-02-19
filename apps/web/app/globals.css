@@ -82,15 +82,7 @@ body {
   margin-bottom: 0.6rem;
 }
 
-.auth-panel {
-  border: 1px solid var(--border);
-  background: rgba(255, 253, 248, 0.94);
-  backdrop-filter: blur(4px);
-  border-radius: 10px;
-  padding: 0.3rem 0.45rem;
-}
-
-.auth-panel .auth-controls button {
+.auth-controls button {
   font-size: 0.85rem;
 }
 
@@ -110,6 +102,11 @@ body {
 .auth-user-avatar {
   border-radius: 8px;
   border: 1px solid #ccbfae;
+  overflow: hidden;
+}
+
+.auth-user-avatar img {
+  filter: grayscale(1) sepia(0.25) brightness(1.05);
 }
 
 .auth-user-popover {
@@ -673,6 +670,12 @@ button.destructive:focus-visible {
   align-items: center;
   justify-content: space-between;
   gap: 0.6rem;
+}
+
+.reading-title-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .reading-export-panel {

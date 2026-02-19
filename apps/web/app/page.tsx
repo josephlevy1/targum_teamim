@@ -887,9 +887,7 @@ function HomePageInner() {
               </button>
             </div>
           ) : null}
-          <div className="auth-panel">
-            {clerkConfigured ? <AuthControls /> : <div className="small auth-disabled">Auth not configured</div>}
-          </div>
+          {clerkConfigured ? <AuthControls /> : <div className="small auth-disabled">Auth not configured</div>}
         </div>
         <div className="left-scroll nav-scroll">
           <h3>Verse Navigator</h3>
