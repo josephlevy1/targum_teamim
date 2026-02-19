@@ -7,6 +7,11 @@ SERVICE_URL="http://localhost:3000"
 WITH_WWW=0
 INSTALL_SERVICE=0
 
+CONFLICTING_AGENTS=(
+  "com.cloudflare.cloudflared"
+  "homebrew.mxcl.cloudflared"
+)
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --tunnel-name)
@@ -49,6 +54,33 @@ USAGE
       ;;
   esac
 done
+
+unload_launch_agent_if_loaded() {
+  local label="$1"
+  local plist_path="${HOME}/Library/LaunchAgents/${label}.plist"
+
+  if ! command -v launchctl >/dev/null 2>&1; then
+    echo "[WARN] launchctl not found; cannot verify/unload ${label}"
+    return
+  fi
+
+  if ! launchctl list 2>/dev/null | awk '{print $3}' | rg -qx "$label"; then
+    return
+  fi
+
+  echo "[WARN] Found conflicting launchd agent loaded: ${label}"
+  if [[ -f "$plist_path" ]]; then
+    if launchctl bootout "gui/$(id -u)" "$plist_path" >/dev/null 2>&1; then
+      echo "[OK] Unloaded ${label} via launchctl bootout"
+    elif launchctl unload -w "$plist_path" >/dev/null 2>&1; then
+      echo "[OK] Unloaded ${label} via launchctl unload"
+    else
+      echo "[WARN] Could not unload ${label}. Stop it manually before relying on PM2-only supervision."
+    fi
+  else
+    echo "[WARN] ${label} is loaded but plist not found at ${plist_path}. Manual unload required."
+  fi
+}
 
 if ! command -v cloudflared >/dev/null 2>&1; then
   echo "[ERROR] cloudflared is not installed. Run: brew install cloudflared" >&2
@@ -128,6 +160,10 @@ if [[ "$WITH_WWW" -eq 1 ]]; then
 fi
 
 if [[ "$INSTALL_SERVICE" -eq 1 ]]; then
+  for label in "${CONFLICTING_AGENTS[@]}"; do
+    unload_launch_agent_if_loaded "$label"
+  done
+
   echo "[...] Starting cloudflared under PM2"
   if command -v pm2 >/dev/null 2>&1; then
     pm2 delete cloudflared-taam >/dev/null 2>&1 || true
@@ -149,3 +185,5 @@ echo "Next checks:"
 echo "1) cloudflared tunnel info ${TUNNEL_NAME}"
 echo "2) pnpm pm2:status"
 echo "3) open https://${HOSTNAME}"
+echo ""
+echo "Supervisor policy: PM2 is canonical for cloudflared-taam and targum-web."

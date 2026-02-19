@@ -14,6 +14,7 @@
     "backup": "bash scripts/backup-db.sh",
     "pm2:status": "pm2 list",
     "pm2:logs": "pm2 logs",
+    "pm2:startup:setup": "bash scripts/setup-pm2-startup.sh",
     "deploy:taam:setup": "bash scripts/setup-cloudflared-taam.sh --hostname taam.im --with-www --install-service",
     "deploy:taam:check": "bash scripts/check-taam-deploy.sh taam.im"
   }
