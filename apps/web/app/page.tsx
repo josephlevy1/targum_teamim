@@ -114,14 +114,14 @@ function parseVerseId(id: string): ParsedVerseRef | null {
 
 function isEditableTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
-  if (target.isContentEditable) return true;
-  if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT") return true;
-  return Boolean(target.closest("[contenteditable='true'], input, textarea, select, [role='textbox']"));
-}
-
-function hasOpenModal(): boolean {
-  if (typeof document === "undefined") return false;
-  return Boolean(document.querySelector("dialog[open], [aria-modal='true']"));
+  const editable = target.closest<HTMLElement>("[contenteditable='true'], input, textarea, select, [role='textbox']");
+  if (!editable) return false;
+  if (editable instanceof HTMLInputElement && editable.type === "hidden") return false;
+  if (editable.getAttribute("aria-hidden") === "true" || editable.closest("[aria-hidden='true'], [hidden], [inert]")) return false;
+  const style = window.getComputedStyle(editable);
+  if (style.display === "none" || style.visibility === "hidden") return false;
+  if (editable.getClientRects().length === 0) return false;
+  return true;
 }
 
 export default function HomePage() {
@@ -559,14 +559,22 @@ function HomePageInner() {
   }
 
   async function moveSelected(tokenDelta: number, letterDelta: number) {
-    if (!record || !selectedTaam) return;
+    if (!record) return;
+    const taam = selectedTaam ?? record.edited[0] ?? null;
+    if (!taam) {
+      setUiMessage({ type: "info", text: "No ta'am available to move in this verse." });
+      return;
+    }
+    if (!selectedTaam) {
+      setSelectedTaamId(taam.taamId);
+    }
     const tokenCount = record.verse.aramaicTokens.length;
     if (tokenCount === 0) return;
     const maxLetterForToken = (tokenIndex: number) =>
       Math.max(0, (record.verse.aramaicTokens[tokenIndex]?.letters.length ?? 1) - 1);
 
-    let toToken = Math.max(0, Math.min(tokenCount - 1, selectedTaam.position.tokenIndex + tokenDelta));
-    let toLetter = Math.max(0, Math.min(maxLetterForToken(toToken), selectedTaam.position.letterIndex));
+    let toToken = Math.max(0, Math.min(tokenCount - 1, taam.position.tokenIndex + tokenDelta));
+    let toLetter = Math.max(0, Math.min(maxLetterForToken(toToken), taam.position.letterIndex));
 
     if (letterDelta !== 0) {
       const step = letterDelta > 0 ? 1 : -1;
@@ -593,15 +601,23 @@ function HomePageInner() {
 
     await postPatch({
       type: "MOVE_TAAM",
-      taamId: selectedTaam.taamId,
-      from: selectedTaam.position,
+      taamId: taam.taamId,
+      from: taam.position,
       to: { tokenIndex: toToken, letterIndex: toLetter },
     });
   }
 
   async function deleteSelected() {
-    if (!selectedTaam) return;
-    await postPatch({ type: "DELETE_TAAM", taamId: selectedTaam.taamId });
+    if (!record) return;
+    const taam = selectedTaam ?? record.edited[0] ?? null;
+    if (!taam) {
+      setUiMessage({ type: "info", text: "No ta'am available to delete in this verse." });
+      return;
+    }
+    if (!selectedTaam) {
+      setSelectedTaamId(taam.taamId);
+    }
+    await postPatch({ type: "DELETE_TAAM", taamId: taam.taamId });
   }
 
   function beginAdd() {
@@ -638,12 +654,20 @@ function HomePageInner() {
   }
 
   function replaceSelected() {
-    if (!selectedTaam) return;
+    if (!record) return;
+    const taam = selectedTaam ?? record.edited[0] ?? null;
+    if (!taam) {
+      setUiMessage({ type: "info", text: "No ta'am available to replace in this verse." });
+      return;
+    }
+    if (!selectedTaam) {
+      setSelectedTaamId(taam.taamId);
+    }
     if (editPickerMode === "replace") {
       setEditPickerMode(null);
       return;
     }
-    const suggested = TAAM_REPLACEMENTS.find((t) => t.name === selectedTaam.name)?.name ?? TAAM_REPLACEMENTS[0]?.name;
+    const suggested = TAAM_REPLACEMENTS.find((t) => t.name === taam.name)?.name ?? TAAM_REPLACEMENTS[0]?.name;
     if (suggested) {
       setEditPresetName(suggested);
     }
@@ -810,9 +834,8 @@ function HomePageInner() {
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (!record) return;
-      if (e.defaultPrevented) return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
-      if (isEditableTarget(e.target) || hasOpenModal()) return;
+      if (isEditableTarget(e.target)) return;
       if (e.key === "[") {
         e.preventDefault();
         void moveSelected(1, 0);
@@ -859,8 +882,8 @@ function HomePageInner() {
       }
     }
 
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
   }, [record, selectedTaam, activeToken, notes]);
 
   return (
