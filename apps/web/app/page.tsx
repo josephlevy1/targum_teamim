@@ -122,22 +122,7 @@ function isEditableTarget(target: EventTarget | null): boolean {
 
 function hasOpenModal(): boolean {
   if (typeof document === "undefined") return false;
-  return Boolean(
-    document.querySelector(
-      "dialog[open], [aria-modal='true'], [role='dialog'], [data-reach-dialog-overlay], [data-state='open'][role='dialog']",
-    ),
-  );
-}
-
-function shouldIgnoreShortcuts(e: KeyboardEvent): boolean {
-  if (e.defaultPrevented) return true;
-  if (e.metaKey || e.ctrlKey || e.altKey) return true;
-  if (isEditableTarget(e.target)) return true;
-  if (typeof document === "undefined") return false;
-  const activeElement = document.activeElement;
-  if (activeElement instanceof HTMLIFrameElement) return true;
-  if (isEditableTarget(activeElement)) return true;
-  return hasOpenModal();
+  return Boolean(document.querySelector("dialog[open], [aria-modal='true']"));
 }
 
 export default function HomePage() {
@@ -836,7 +821,9 @@ function HomePageInner() {
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (!record) return;
-      if (shouldIgnoreShortcuts(e)) return;
+      if (e.defaultPrevented) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (isEditableTarget(e.target) || hasOpenModal()) return;
       if (e.key === "[") {
         e.preventDefault();
         void moveSelected(1, 0);
