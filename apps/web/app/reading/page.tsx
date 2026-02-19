@@ -2,6 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { AuthControls } from "@/components/auth-controls";
 import { sanitizeFileNamePart } from "@/lib/export-ranges";
 
 type ReadingVerse = {
@@ -35,11 +36,12 @@ function ReadingPageInner() {
   const [payload, setPayload] = useState<ReadingPayload | null>(null);
   const [selectedVerseId, setSelectedVerseId] = useState("");
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const [uiMessage, setUiMessage] = useState<{ type: "error" | "info"; text: string } | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const [exportBusy, setExportBusy] = useState(false);
   const [exportMessage, setExportMessage] = useState("");
   const [exportActiveAction, setExportActiveAction] = useState<"verse" | "chapter" | "all" | null>(null);
+  const clerkConfigured = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
 
   const selectedBook = searchParams.get("book") ?? "";
   const selectedChapterRaw = Number(searchParams.get("chapter"));
@@ -69,7 +71,7 @@ function ReadingPageInner() {
   const loadReading = useCallback(
     async (book: string, chapter: number) => {
       setBusy(true);
-      setError("");
+      setUiMessage(null);
       try {
         const params = new URLSearchParams();
         if (book) params.set("book", book);
@@ -87,7 +89,7 @@ function ReadingPageInner() {
           syncUrl(json.selectedBook, json.selectedChapter, nextSelected);
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load reading data.");
+        setUiMessage({ type: "error", text: err instanceof Error ? err.message : "Failed to load reading data." });
       } finally {
         setBusy(false);
       }
@@ -107,7 +109,7 @@ function ReadingPageInner() {
     });
     if (!response.ok) {
       const details = (await response.json().catch(() => null)) as { error?: string } | null;
-      window.alert(details?.error ?? "Failed to update flag.");
+      setUiMessage({ type: "error", text: details?.error ?? "Failed to update flag." });
       return;
     }
     setPayload((current) => {
@@ -127,7 +129,7 @@ function ReadingPageInner() {
     });
     if (!response.ok) {
       const details = (await response.json().catch(() => null)) as { error?: string } | null;
-      window.alert(details?.error ?? "Failed to update verification.");
+      setUiMessage({ type: "error", text: details?.error ?? "Failed to update verification." });
       return;
     }
     setPayload((current) => {
@@ -231,6 +233,19 @@ function ReadingPageInner() {
   return (
     <main className="reading-main">
       <section className="panel reading-controls">
+        <div className="left-panel-header">
+          {uiMessage ? (
+            <div className={`ui-banner ui-banner-${uiMessage.type}`} role="status">
+              <span>{uiMessage.text}</span>
+              <button type="button" className="ui-banner-dismiss" onClick={() => setUiMessage(null)}>
+                Dismiss
+              </button>
+            </div>
+          ) : null}
+          <div className="auth-panel">
+            {clerkConfigured ? <AuthControls /> : <div className="small auth-disabled">Auth not configured</div>}
+          </div>
+        </div>
         <div className="reading-controls-header">
           <div className="reading-controls-title-row">
             <h2>Reading Review</h2>
@@ -332,7 +347,6 @@ function ReadingPageInner() {
       </section>
 
       <section className="panel reading-content">
-        {error ? <div className="small">{error}</div> : null}
         {busy ? <div className="small">Loading chapter…</div> : null}
         {(payload?.verses ?? []).map((verse) => (
           <article

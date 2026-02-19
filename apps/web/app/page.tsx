@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { AuthControls } from "@/components/auth-controls";
 import { bookRange, chapterRange, sanitizeFileNamePart, verseRange, type ExportRange } from "@/lib/export-ranges";
 
 type Tier = "DISJUNCTIVE" | "CONJUNCTIVE" | "METEG_LIKE" | "PISUQ";
@@ -25,7 +26,7 @@ type VerseRecord = {
   verse: { id: string; hebrewTokens: Token[]; aramaicTokens: Token[] };
   generated: GeneratedTaam[];
   edited: GeneratedTaam[];
-  patches: Array<{ id: string; seqNo: number; op: { type: string }; note?: string; createdAt: string }>;
+  patches: Array<{ id: string; seqNo: number; op: { type: string }; note?: string; createdAt: string; author: string }>;
   state: { verified: boolean; flagged: boolean; manuscriptNotes: string; patchCursor: number };
 };
 
@@ -121,7 +122,9 @@ export default function HomePage() {
 }
 
 function HomePageInner() {
+  const [uiMessage, setUiMessage] = useState<{ type: "error" | "info"; text: string } | null>(null);
   const searchParams = useSearchParams();
+  const clerkConfigured = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
   const modeParam = searchParams.get("mode") ?? "";
   const loadVerseRequestSeq = useRef(0);
   const [verseItems, setVerseItems] = useState<Array<{ verseId: string; verified: boolean; flagged: boolean; avgConfidence: number }>>([]);
@@ -519,8 +522,22 @@ function HomePageInner() {
     setNotes(json.state.manuscriptNotes ?? "");
   }
 
+  async function postWrite(path: string, payload?: unknown): Promise<void> {
+    setUiMessage(null);
+    const response = await fetch(path, {
+      method: "POST",
+      headers: payload ? { "Content-Type": "application/json" } : undefined,
+      body: payload ? JSON.stringify(payload) : undefined,
+    });
+    if (!response.ok) {
+      const details = (await response.json().catch(() => null)) as { error?: string } | null;
+      throw new Error(details?.error ?? "Failed to save changes.");
+    }
+  }
+
   async function postPatch(op: unknown, note?: string, preferredTaamId?: string) {
     if (!record) return;
+    setUiMessage(null);
     try {
       const response = await fetch(versePath(record.verse.id, "/patch"), {
         method: "POST",
@@ -533,9 +550,10 @@ function HomePageInner() {
       }
       await loadVerse(record.verse.id, preferredTaamId);
       await refreshVerses();
+      setUiMessage(null);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to save patch.";
-      window.alert(message);
+      setUiMessage({ type: "error", text: message });
     }
   }
 
@@ -658,6 +676,7 @@ function HomePageInner() {
   async function runTranspose(clearPatches: boolean) {
     if (!verseId) return;
     setTransposeBusy(true);
+    setUiMessage(null);
     try {
       const response = await fetch(`/api/transpose/${encodeURIComponent(verseId)}`, { method: "POST" });
       const payload = (await response.json()) as { error?: string };
@@ -673,9 +692,10 @@ function HomePageInner() {
       }
       await loadVerse(verseId);
       await refreshVerses();
+      setUiMessage(null);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Transpose failed.";
-      window.alert(message);
+      setUiMessage({ type: "error", text: message });
     } finally {
       setTransposeBusy(false);
       setTransposeConfirmMode(false);
@@ -697,38 +717,50 @@ function HomePageInner() {
 
   async function undo() {
     if (!record) return;
-    await fetch(versePath(record.verse.id, "/undo"), { method: "POST" });
-    await loadVerse(record.verse.id);
-    await refreshVerses();
+    try {
+      await postWrite(versePath(record.verse.id, "/undo"));
+      await loadVerse(record.verse.id);
+      await refreshVerses();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to undo.";
+      setUiMessage({ type: "error", text: message });
+    }
   }
 
   async function redo() {
     if (!record) return;
-    await fetch(versePath(record.verse.id, "/redo"), { method: "POST" });
-    await loadVerse(record.verse.id);
-    await refreshVerses();
+    try {
+      await postWrite(versePath(record.verse.id, "/redo"));
+      await loadVerse(record.verse.id);
+      await refreshVerses();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to redo.";
+      setUiMessage({ type: "error", text: message });
+    }
   }
 
   async function saveVerification(verified: boolean) {
     if (!record) return;
-    await fetch(versePath(record.verse.id, "/verify"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ verified, manuscriptNotes: notes }),
-    });
-    await loadVerse(record.verse.id);
-    await refreshVerses();
+    try {
+      await postWrite(versePath(record.verse.id, "/verify"), { verified, manuscriptNotes: notes });
+      await loadVerse(record.verse.id);
+      await refreshVerses();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to save verification.";
+      setUiMessage({ type: "error", text: message });
+    }
   }
 
   async function saveFlagged(flagged: boolean) {
     if (!record) return;
-    await fetch(versePath(record.verse.id, "/flag"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ flagged }),
-    });
-    await loadVerse(record.verse.id);
-    await refreshVerses();
+    try {
+      await postWrite(versePath(record.verse.id, "/flag"), { flagged });
+      await loadVerse(record.verse.id);
+      await refreshVerses();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to save flag.";
+      setUiMessage({ type: "error", text: message });
+    }
   }
 
   function jumpToAdjacentVerse(offset: number) {
@@ -830,6 +862,19 @@ function HomePageInner() {
   return (
     <main>
       <section className="panel left-panel">
+        <div className="left-panel-header">
+          {uiMessage ? (
+            <div className={`ui-banner ui-banner-${uiMessage.type}`} role="status">
+              <span>{uiMessage.text}</span>
+              <button type="button" className="ui-banner-dismiss" onClick={() => setUiMessage(null)}>
+                Dismiss
+              </button>
+            </div>
+          ) : null}
+          <div className="auth-panel">
+            {clerkConfigured ? <AuthControls /> : <div className="small auth-disabled">Auth not configured</div>}
+          </div>
+        </div>
         <div className="left-scroll nav-scroll">
           <h3>Verse Navigator</h3>
           <label className="small field-label">Book</label>
@@ -1111,7 +1156,7 @@ function HomePageInner() {
               <summary className="section-title">Patch History</summary>
               {(record?.patches ?? []).map((p) => (
                 <div key={p.id} className="small">
-                  #{p.seqNo} {p.op.type} {p.note ?? ""}
+                  #{p.seqNo} {p.op.type} by {p.author} {p.note ?? ""}
                 </div>
               ))}
             </details>
