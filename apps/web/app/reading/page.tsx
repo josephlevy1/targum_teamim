@@ -41,7 +41,7 @@ function ReadingPageInner() {
   const [exportBusy, setExportBusy] = useState(false);
   const [exportMessage, setExportMessage] = useState("");
   const [exportActiveAction, setExportActiveAction] = useState<"verse" | "chapter" | "all" | null>(null);
-  const clerkConfigured = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY && process.env.CLERK_SECRET_KEY);
+  const clerkConfigured = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
 
   const selectedBook = searchParams.get("book") ?? "";
   const selectedChapterRaw = Number(searchParams.get("chapter"));
@@ -233,30 +233,28 @@ function ReadingPageInner() {
   return (
     <main className="reading-main">
       <section className="panel reading-controls">
-        <div className="left-panel-header">
-          {uiMessage ? (
-            <div className={`ui-banner ui-banner-${uiMessage.type}`} role="status">
-              <span>{uiMessage.text}</span>
-              <button type="button" className="ui-banner-dismiss" onClick={() => setUiMessage(null)}>
-                Dismiss
-              </button>
-            </div>
-          ) : null}
-          <div className="auth-panel">
-            {clerkConfigured ? <AuthControls /> : <div className="small auth-disabled">Auth not configured</div>}
+        {uiMessage ? (
+          <div className={`ui-banner ui-banner-${uiMessage.type}`} role="status">
+            <span>{uiMessage.text}</span>
+            <button type="button" className="ui-banner-dismiss" onClick={() => setUiMessage(null)}>
+              Dismiss
+            </button>
           </div>
-        </div>
+        ) : null}
         <div className="reading-controls-header">
           <div className="reading-controls-title-row">
             <h2>Reading Review</h2>
-            <button
-              type="button"
-              className="reading-edit-btn"
-              aria-expanded={exportOpen}
-              onClick={() => setExportOpen((open) => !open)}
-            >
-              Export
-            </button>
+            <div className="reading-title-actions">
+              {clerkConfigured ? <AuthControls /> : <div className="small auth-disabled">Auth not configured</div>}
+              <button
+                type="button"
+                className="reading-edit-btn"
+                aria-expanded={exportOpen}
+                onClick={() => setExportOpen((open) => !open)}
+              >
+                Export
+              </button>
+            </div>
           </div>
           <div className="small">Chapter review with verse actions</div>
           {exportOpen ? (
