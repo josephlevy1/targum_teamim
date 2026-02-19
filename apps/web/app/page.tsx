@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { compareVerseIdsCanonical } from "@targum/core";
 import { AuthControls } from "@/components/auth-controls";
 import { bookRange, chapterRange, sanitizeFileNamePart, verseRange, type ExportRange } from "@/lib/export-ranges";
 
@@ -92,8 +93,6 @@ function tokenPreviewWithLetterHighlight(token: Token, letterIndex: number) {
     </span>
   );
 }
-
-const TORAH_BOOK_INDEX: Record<string, number> = { Genesis: 0, Exodus: 1, Leviticus: 2, Numbers: 3, Deuteronomy: 4 };
 
 function versePath(verseId: string, suffix = ""): string {
   return `/api/verse/${encodeURIComponent(verseId)}${suffix}`;
@@ -199,13 +198,7 @@ function HomePageInner() {
       verseItems
         .map((item) => parseVerseId(item.verseId))
         .filter((item): item is ParsedVerseRef => item !== null)
-        .sort((a, b) => {
-          const aIdx = TORAH_BOOK_INDEX[a.book] ?? 99;
-          const bIdx = TORAH_BOOK_INDEX[b.book] ?? 99;
-          if (aIdx !== bIdx) return aIdx - bIdx;
-          if (a.chapter !== b.chapter) return a.chapter - b.chapter;
-          return a.verse - b.verse;
-        }),
+        .sort((a, b) => compareVerseIdsCanonical(a.id, b.id)),
     [verseItems],
   );
   const verseItemsWithRef = useMemo(
@@ -299,12 +292,7 @@ function HomePageInner() {
     [verseFilterMode, verseItemsWithRef],
   );
   const visibleVerseItems = useMemo(() => {
-    const compareRefs = (a: ParsedVerseRef, b: ParsedVerseRef) => {
-      const byBook = a.book.localeCompare(b.book);
-      if (byBook !== 0) return byBook;
-      if (a.chapter !== b.chapter) return a.chapter - b.chapter;
-      return a.verse - b.verse;
-    };
+    const compareRefs = (a: ParsedVerseRef, b: ParsedVerseRef) => compareVerseIdsCanonical(a.id, b.id);
 
     const filtered = verseItemsWithRef.filter((item) => {
       if (verseFilterMode === "verified") return item.verified;
