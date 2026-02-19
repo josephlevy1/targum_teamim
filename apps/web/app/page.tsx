@@ -113,6 +113,18 @@ function parseVerseId(id: string): ParsedVerseRef | null {
   return { id, book, chapter, verse };
 }
 
+function isEditableTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  if (target.isContentEditable) return true;
+  if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT") return true;
+  return Boolean(target.closest("[contenteditable='true'], input, textarea, select, [role='textbox']"));
+}
+
+function hasOpenModal(): boolean {
+  if (typeof document === "undefined") return false;
+  return Boolean(document.querySelector("dialog[open], [aria-modal='true']"));
+}
+
 export default function HomePage() {
   return (
     <Suspense>
@@ -124,7 +136,8 @@ export default function HomePage() {
 function HomePageInner() {
   const [uiMessage, setUiMessage] = useState<{ type: "error" | "info"; text: string } | null>(null);
   const searchParams = useSearchParams();
-  const clerkConfigured = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY && process.env.CLERK_SECRET_KEY);
+  // Client rendering should only depend on NEXT_PUBLIC env vars to avoid SSR/client mismatch.
+  const clerkConfigured = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
   const modeParam = searchParams.get("mode") ?? "";
   const loadVerseRequestSeq = useRef(0);
   const [verseItems, setVerseItems] = useState<Array<{ verseId: string; verified: boolean; flagged: boolean; avgConfidence: number }>>([]);
@@ -809,6 +822,9 @@ function HomePageInner() {
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (!record) return;
+      if (e.defaultPrevented) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (isEditableTarget(e.target) || hasOpenModal()) return;
       if (e.key === "[") {
         e.preventDefault();
         void moveSelected(1, 0);
