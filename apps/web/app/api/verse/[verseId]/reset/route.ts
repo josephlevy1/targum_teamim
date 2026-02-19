@@ -1,13 +1,24 @@
 import { NextResponse } from "next/server";
+import { authErrorResponse, requireEditorUser } from "@/lib/authz";
 import { getRepository } from "@/lib/repository";
 
 export async function POST(_: Request, ctx: { params: Promise<{ verseId: string }> }) {
-  const { verseId } = await ctx.params;
-  const repo = getRepository();
-  if (!repo.getVerseRecord(verseId as any)) {
-    return NextResponse.json({ error: "Verse not found" }, { status: 404 });
-  }
+  try {
+    await requireEditorUser();
+    const { verseId } = await ctx.params;
+    const repo = getRepository();
+    if (!repo.getVerseRecord(verseId as any)) {
+      return NextResponse.json({ error: "Verse not found" }, { status: 404 });
+    }
 
-  const cursor = repo.resetVerse(verseId as any);
-  return NextResponse.json({ patchCursor: cursor });
+    const cursor = repo.resetVerse(verseId as any);
+    return NextResponse.json({ patchCursor: cursor });
+  } catch (error) {
+    const authResponse = authErrorResponse(error);
+    if (authResponse) {
+      return authResponse;
+    }
+    const message = error instanceof Error ? error.message : "Failed to reset verse.";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 }

@@ -175,8 +175,9 @@ export class TargumRepository {
     this.writeVerseMirror(verseId);
   }
 
-  addPatch(verseId: VerseId, op: PatchOp, note?: string): PatchEntry {
-    const run = this.db.transaction((targetVerseId: VerseId, patchOp: PatchOp, patchNote?: string): PatchEntry => {
+  addPatch(verseId: VerseId, op: PatchOp, note?: string, authorOverride?: string): PatchEntry {
+    const run = this.db.transaction(
+      (targetVerseId: VerseId, patchOp: PatchOp, patchNote: string | undefined, patchAuthor: string): PatchEntry => {
       const row = this.db
         .prepare("SELECT COALESCE(MAX(seq_no), 0) as maxSeq FROM patches WHERE verse_id = ?")
         .get(targetVerseId) as { maxSeq: number };
@@ -185,7 +186,7 @@ export class TargumRepository {
         id: crypto.randomUUID(),
         verseId: targetVerseId,
         op: patchOp,
-        author: this.options.author,
+        author: patchAuthor,
         note: patchNote,
         createdAt: now,
         seqNo: row.maxSeq + 1,
@@ -202,9 +203,10 @@ export class TargumRepository {
         .prepare("UPDATE verse_state SET patch_cursor = ?, updated_at = ? WHERE verse_id = ?")
         .run(entry.seqNo, now, targetVerseId);
       return entry;
-    });
+      },
+    );
 
-    const entry = run(verseId, op, note);
+    const entry = run(verseId, op, note, authorOverride ?? this.options.author);
 
     this.writePatchMirror(verseId);
     this.writeVerseMirror(verseId);

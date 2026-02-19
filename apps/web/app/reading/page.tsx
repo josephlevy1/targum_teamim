@@ -41,7 +41,7 @@ function ReadingPageInner() {
   const [exportBusy, setExportBusy] = useState(false);
   const [exportMessage, setExportMessage] = useState("");
   const [exportActiveAction, setExportActiveAction] = useState<"verse" | "chapter" | "all" | null>(null);
-  const clerkConfigured = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
+  const clerkConfigured = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY && process.env.CLERK_SECRET_KEY);
 
   const selectedBook = searchParams.get("book") ?? "";
   const selectedChapterRaw = Number(searchParams.get("chapter"));

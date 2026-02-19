@@ -57,3 +57,19 @@ pnpm deploy:taam:check
 ```
 
 Detailed runbook: `docs/deploy-taam-im.md`
+
+## Authentication (Clerk)
+
+Issue #2 uses Clerk for login/session handling.
+
+Required environment variables in `apps/web/.env`:
+
+```bash
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_live_or_test_xxx
+CLERK_SECRET_KEY=sk_live_or_test_xxx
+```
+
+Behavior:
+- read routes/pages remain public,
+- verse mutation routes require login and return `401` when signed out,
+- patch history stores the signed-in Clerk username (with fallback to email local-part, then user id prefix).

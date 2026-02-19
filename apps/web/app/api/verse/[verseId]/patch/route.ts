@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getRepository } from "@/lib/repository";
+import { authErrorResponse, requireEditorUser } from "@/lib/authz";
 
 const positionSchema = z.object({ tokenIndex: z.number().int().nonnegative(), letterIndex: z.number().int().nonnegative() });
 const generatedSchema = z.object({
@@ -29,6 +30,7 @@ const patchSchema = z.discriminatedUnion("type", [
 
 export async function POST(request: Request, ctx: { params: Promise<{ verseId: string }> }) {
   try {
+    const user = await requireEditorUser();
     const { verseId } = await ctx.params;
     const body = await request.json();
     const parsed = patchSchema.safeParse(body.op);
@@ -38,9 +40,13 @@ export async function POST(request: Request, ctx: { params: Promise<{ verseId: s
 
     const note = typeof body.note === "string" ? body.note : undefined;
     const repo = getRepository();
-    const entry = repo.addPatch(verseId as any, parsed.data as any, note);
+    const entry = repo.addPatch(verseId as any, parsed.data as any, note, user.username);
     return NextResponse.json(entry);
   } catch (error) {
+    const authResponse = authErrorResponse(error);
+    if (authResponse) {
+      return authResponse;
+    }
     const message = error instanceof Error ? error.message : "Failed to apply patch.";
     return NextResponse.json({ error: message }, { status: 500 });
   }
