@@ -4,6 +4,7 @@ node_modules/
 # Next.js
 .next/
 out/
+/apps/web/.next.bak.*/
 
 # Build artifacts
 packages/*/dist/
@@ -33,6 +34,10 @@ logs/
 
 # PM2
 .pm2/
+
+# Local assistant/editor workspace artifacts
+/.claude/settings.local.json
+/.claude/worktrees/
 
 # OS
 .DS_Store
