@@ -136,7 +136,8 @@ export default function HomePage() {
 function HomePageInner() {
   const [uiMessage, setUiMessage] = useState<{ type: "error" | "info"; text: string } | null>(null);
   const searchParams = useSearchParams();
-  const clerkConfigured = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY && process.env.CLERK_SECRET_KEY);
+  // Client rendering should only depend on NEXT_PUBLIC env vars to avoid SSR/client mismatch.
+  const clerkConfigured = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
   const modeParam = searchParams.get("mode") ?? "";
   const loadVerseRequestSeq = useRef(0);
   const [verseItems, setVerseItems] = useState<Array<{ verseId: string; verified: boolean; flagged: boolean; avgConfidence: number }>>([]);
