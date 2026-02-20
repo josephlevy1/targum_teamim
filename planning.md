@@ -16,6 +16,7 @@ Add a pipeline to import two scanned manuscript sources (page images) as *witnes
   1) Vatican witness (highest authority)
   2) HebrewBooks witness
   3) existing baseline digital Aramaic (already imported; current setup)
+- Vatican and Hebrewbooks can be found in /book_sources with /book_sources/book_list.csv providing the prioritization for sources and the source details
 
 The system must tolerate missing/ripped pages and proceed with fallbacks automatically.
 
