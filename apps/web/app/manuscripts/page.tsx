@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { displayRectToImageRect, imageRectToDisplayRect, normalizeDragRect } from "@/lib/manuscripts-annotator";
 
 type Witness = {
   id: string;
@@ -187,12 +188,13 @@ export default function ManuscriptsPage() {
     const displayWidth = img.clientWidth || 1;
     const displayHeight = img.clientHeight || 1;
 
-    return {
-      left: (region.bbox.x / naturalWidth) * displayWidth,
-      top: (region.bbox.y / naturalHeight) * displayHeight,
-      width: (region.bbox.w / naturalWidth) * displayWidth,
-      height: (region.bbox.h / naturalHeight) * displayHeight,
-    };
+    const rect = imageRectToDisplayRect(region.bbox, {
+      naturalWidth,
+      naturalHeight,
+      displayWidth,
+      displayHeight,
+    });
+    return { left: rect.x, top: rect.y, width: rect.w, height: rect.h };
   }
 
   function updateBboxFromDisplayRect(rect: { x: number; y: number; w: number; h: number }) {
@@ -203,12 +205,16 @@ export default function ManuscriptsPage() {
     const naturalWidth = img.naturalWidth || 1;
     const naturalHeight = img.naturalHeight || 1;
 
-    const scaleX = naturalWidth / displayWidth;
-    const scaleY = naturalHeight / displayHeight;
-    setBboxX(String(Math.round(rect.x * scaleX)));
-    setBboxY(String(Math.round(rect.y * scaleY)));
-    setBboxW(String(Math.round(rect.w * scaleX)));
-    setBboxH(String(Math.round(rect.h * scaleY)));
+    const imageRect = displayRectToImageRect(rect, {
+      naturalWidth,
+      naturalHeight,
+      displayWidth,
+      displayHeight,
+    });
+    setBboxX(String(imageRect.x));
+    setBboxY(String(imageRect.y));
+    setBboxW(String(imageRect.w));
+    setBboxH(String(imageRect.h));
   }
 
   function onOverlayPointerDown(event: ReactPointerEvent<HTMLDivElement>) {
@@ -225,11 +231,7 @@ export default function ManuscriptsPage() {
     const container = event.currentTarget.getBoundingClientRect();
     const cx = clamp(event.clientX - container.left, 0, container.width);
     const cy = clamp(event.clientY - container.top, 0, container.height);
-    const x = Math.min(drawStart.x, cx);
-    const y = Math.min(drawStart.y, cy);
-    const w = Math.abs(cx - drawStart.x);
-    const h = Math.abs(cy - drawStart.y);
-    setDraftRect({ x, y, w, h });
+    setDraftRect(normalizeDragRect(drawStart, { x: cx, y: cy }));
   }
 
   function onOverlayPointerUp() {

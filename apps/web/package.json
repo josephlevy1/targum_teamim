@@ -14,7 +14,8 @@
     "import:targum": "tsx scripts/import-targum.ts",
     "transpose": "tsx scripts/transpose-range.ts",
     "scrape:torah": "tsx scripts/scrape-torah.ts",
-    "run:torah": "tsx scripts/run-torah.ts"
+    "run:torah": "tsx scripts/run-torah.ts",
+    "manuscripts:calibration": "tsx scripts/run-manuscript-calibration.ts"
   },
   "dependencies": {
     "@clerk/nextjs": "^6.10.0",

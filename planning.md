@@ -186,3 +186,10 @@ If not provided, build tools/UI to capture mapping iteratively.
   - `Migration / Data Notes`
   - `Test Evidence`
 - CI enforces `pnpm typecheck` and `pnpm test` on every pull request.
+
+## Branch Protection Verification (2026-02-20)
+- Verified via GitHub API that `main` branch protection is active.
+- Required PR approvals: 2.
+- Required status checks: `quality-checks`, `validate-pr-body`.
+- Strict required status checks and admin enforcement are enabled.
+- Verification record: `docs/branch-protection-verification-2026-02-20.md`.

@@ -426,4 +426,83 @@ describe("TargumRepository manuscript foundations", () => {
       fs.rmSync(root, { recursive: true, force: true });
     }
   });
+
+  it("shows improving automation precision after accepted ground-truth samples", () => {
+    const { repo, root } = createTempRepo();
+    try {
+      const witness = repo.upsertWitness({
+        id: "precision_witness",
+        name: "Precision Witness",
+        type: "scanned_images",
+        authorityWeight: 1,
+      });
+      const sourceDir = path.join(root, "precision-source");
+      fs.mkdirSync(sourceDir, { recursive: true });
+      fs.writeFileSync(path.join(sourceDir, "001.png"), "png");
+      const imported = repo.importPagesFromDirectory({ witnessId: witness.id, directoryPath: sourceDir });
+      const pageId = imported.pages[0].id;
+
+      repo.addAutomationFeedback({
+        pageId,
+        proposalType: "blocks",
+        proposalId: "seed-bad",
+        accepted: false,
+        confidence: 0.2,
+        hasGroundTruth: true,
+      });
+      const before = repo.getAutomationMetrics("blocks").precision;
+
+      repo.addAutomationFeedback({
+        pageId,
+        proposalType: "blocks",
+        proposalId: "seed-good",
+        accepted: true,
+        confidence: 0.95,
+        hasGroundTruth: true,
+      });
+      const after = repo.getAutomationMetrics("blocks").precision;
+      expect(after).toBeGreaterThan(before);
+    } finally {
+      repo.close();
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("keeps exports byte-stable across repeated runs", () => {
+    const { repo, root } = createTempRepo();
+    try {
+      repo.upsertVerse(sampleVerse("Genesis:1:1"));
+      repo.saveGenerated("Genesis:1:1", [
+        {
+          taamId: "t1",
+          name: "TIPEHA",
+          unicodeMark: "\u0596",
+          tier: "CONJUNCTIVE",
+          position: { tokenIndex: 0, letterIndex: 0 },
+          confidence: 0.8,
+          reasons: ["seed"],
+        },
+      ]);
+      repo.addPatch("Genesis:1:1", { type: "DELETE_TAAM", taamId: "t1" }, "remove");
+
+      const jsonA = JSON.stringify(repo.exportJson());
+      const jsonB = JSON.stringify(repo.exportJson());
+      expect(jsonA).toBe(jsonB);
+
+      const unicodeRenderer = (record: any) =>
+        JSON.stringify({
+          verseId: record.verse.id,
+          state: record.state.patchCursor,
+          generatedCount: record.generated.length,
+          patchCount: record.patches.length,
+        });
+
+      const unicodeA = repo.exportUnicode(unicodeRenderer);
+      const unicodeB = repo.exportUnicode(unicodeRenderer);
+      expect(unicodeA).toBe(unicodeB);
+    } finally {
+      repo.close();
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
 });
