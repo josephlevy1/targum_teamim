@@ -27,7 +27,16 @@ type VerseRecord = {
   verse: { id: string; hebrewTokens: Token[]; aramaicTokens: Token[] };
   generated: GeneratedTaam[];
   edited: GeneratedTaam[];
-  patches: Array<{ id: string; seqNo: number; op: { type: string }; note?: string; createdAt: string; author: string }>;
+  patches: Array<{
+    id: string;
+    seqNo: number;
+    op: { type: string };
+    note?: string;
+    createdAt: string;
+    author: string;
+    sourceType: "manual" | "import" | "automation";
+    sourceWitnessId?: string | null;
+  }>;
   state: { verified: boolean; flagged: boolean; manuscriptNotes: string; patchCursor: number };
 };
 
@@ -1252,11 +1261,12 @@ function HomePageInner() {
 
             <details className="patch-history">
               <summary className="section-title">Patch History</summary>
-              {(record?.patches ?? []).map((p) => (
-                <div key={p.id} className="small">
-                  #{p.seqNo} {p.op.type} by {p.author} {p.note ?? ""}
-                </div>
-              ))}
+                {(record?.patches ?? []).map((p) => (
+                  <div key={p.id} className="small">
+                  #{p.seqNo} {p.op.type} by {p.author} [{p.sourceType}
+                  {p.sourceWitnessId ? `:${p.sourceWitnessId}` : ""}] {p.note ?? ""}
+                  </div>
+                ))}
             </details>
           </section>
         </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 
 type Witness = {
   id: string;
@@ -17,6 +17,7 @@ type Page = {
   imagePath: string;
   pageIndex: number;
   status: "ok" | "partial" | "unavailable" | "failed";
+  thumbnailPath: string | null;
   quality: Record<string, unknown>;
 };
 
@@ -30,8 +31,24 @@ type Region = {
   status: "ok" | "partial" | "unavailable" | "failed";
 };
 
+type GateSnapshot = {
+  witness: Witness;
+  runState: {
+    ingestStatus: string;
+    ocrStatus: string;
+    splitStatus: string;
+    confidenceStatus: string;
+    blockers: Array<{ detail: string; reasonCode: string }>;
+  };
+};
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
+
 export default function ManuscriptsPage() {
   const [witnesses, setWitnesses] = useState<Witness[]>([]);
+  const [gateSnapshots, setGateSnapshots] = useState<GateSnapshot[]>([]);
   const [selectedWitnessId, setSelectedWitnessId] = useState("");
   const [selectedPageId, setSelectedPageId] = useState("");
   const [pages, setPages] = useState<Page[]>([]);
@@ -45,13 +62,20 @@ export default function ManuscriptsPage() {
   const [bboxY, setBboxY] = useState("0");
   const [bboxW, setBboxW] = useState("100");
   const [bboxH, setBboxH] = useState("100");
+  const [editingRegionId, setEditingRegionId] = useState<string | null>(null);
   const [pipelineVerseId, setPipelineVerseId] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const [drawStart, setDrawStart] = useState<{ x: number; y: number } | null>(null);
+  const [draftRect, setDraftRect] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
 
-  const selectedWitness = useMemo(
-    () => witnesses.find((w) => w.id === selectedWitnessId) ?? null,
-    [selectedWitnessId, witnesses],
+  const imageRef = useRef<HTMLImageElement | null>(null);
+
+  const selectedWitness = useMemo(() => witnesses.find((w) => w.id === selectedWitnessId) ?? null, [selectedWitnessId, witnesses]);
+  const selectedPage = useMemo(() => pages.find((p) => p.id === selectedPageId) ?? null, [pages, selectedPageId]);
+  const selectedGate = useMemo(
+    () => gateSnapshots.find((snapshot) => snapshot.witness.id === selectedWitnessId) ?? null,
+    [gateSnapshots, selectedWitnessId],
   );
 
   async function loadWitnesses() {
@@ -63,9 +87,17 @@ export default function ManuscriptsPage() {
     }
     const next = payload.witnesses ?? [];
     setWitnesses(next);
-    if (!selectedWitnessId && next[0]?.id) {
-      setSelectedWitnessId(next[0].id);
+    if (!selectedWitnessId && next[0]?.id) setSelectedWitnessId(next[0].id);
+  }
+
+  async function loadGateSnapshots() {
+    const response = await fetch("/api/manuscripts/sources");
+    const payload = (await response.json()) as { gating?: GateSnapshot[]; error?: string };
+    if (!response.ok) {
+      setMessage(payload.error ?? "Failed to load source gate state.");
+      return;
     }
+    setGateSnapshots(payload.gating ?? []);
   }
 
   async function loadPages(witnessId: string) {
@@ -78,9 +110,7 @@ export default function ManuscriptsPage() {
     }
     const nextPages = payload.pages ?? [];
     setPages(nextPages);
-    if (!selectedPageId && nextPages[0]?.id) {
-      setSelectedPageId(nextPages[0].id);
-    }
+    if (!selectedPageId && nextPages[0]?.id) setSelectedPageId(nextPages[0].id);
   }
 
   async function loadRegions(pageId: string) {
@@ -110,16 +140,105 @@ export default function ManuscriptsPage() {
 
   useEffect(() => {
     void loadWitnesses();
+    void loadGateSnapshots();
   }, []);
 
   useEffect(() => {
     void loadPages(selectedWitnessId);
     void loadProgress(selectedWitnessId);
+    void loadGateSnapshots();
   }, [selectedWitnessId]);
 
   useEffect(() => {
     void loadRegions(selectedPageId);
   }, [selectedPageId]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      const tagName = target?.tagName ?? "";
+      const editable = tagName === "INPUT" || tagName === "TEXTAREA" || tagName === "SELECT" || target?.isContentEditable;
+      if (editable) return;
+
+      if (event.key === "ArrowRight") {
+        event.preventDefault();
+        const idx = pages.findIndex((page) => page.id === selectedPageId);
+        if (idx >= 0 && idx < pages.length - 1) setSelectedPageId(pages[idx + 1].id);
+      }
+      if (event.key === "ArrowLeft") {
+        event.preventDefault();
+        const idx = pages.findIndex((page) => page.id === selectedPageId);
+        if (idx > 0) setSelectedPageId(pages[idx - 1].id);
+      }
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") {
+        event.preventDefault();
+        void saveRegion();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [pages, selectedPageId, bboxX, bboxY, bboxW, bboxH, status, startVerseId, endVerseId, regions]);
+
+  function regionToDisplayRect(region: Region): { left: number; top: number; width: number; height: number } | null {
+    const img = imageRef.current;
+    if (!img) return null;
+    const naturalWidth = img.naturalWidth || 1;
+    const naturalHeight = img.naturalHeight || 1;
+    const displayWidth = img.clientWidth || 1;
+    const displayHeight = img.clientHeight || 1;
+
+    return {
+      left: (region.bbox.x / naturalWidth) * displayWidth,
+      top: (region.bbox.y / naturalHeight) * displayHeight,
+      width: (region.bbox.w / naturalWidth) * displayWidth,
+      height: (region.bbox.h / naturalHeight) * displayHeight,
+    };
+  }
+
+  function updateBboxFromDisplayRect(rect: { x: number; y: number; w: number; h: number }) {
+    const img = imageRef.current;
+    if (!img) return;
+    const displayWidth = img.clientWidth || 1;
+    const displayHeight = img.clientHeight || 1;
+    const naturalWidth = img.naturalWidth || 1;
+    const naturalHeight = img.naturalHeight || 1;
+
+    const scaleX = naturalWidth / displayWidth;
+    const scaleY = naturalHeight / displayHeight;
+    setBboxX(String(Math.round(rect.x * scaleX)));
+    setBboxY(String(Math.round(rect.y * scaleY)));
+    setBboxW(String(Math.round(rect.w * scaleX)));
+    setBboxH(String(Math.round(rect.h * scaleY)));
+  }
+
+  function onOverlayPointerDown(event: ReactPointerEvent<HTMLDivElement>) {
+    if (!imageRef.current) return;
+    const container = event.currentTarget.getBoundingClientRect();
+    const x = clamp(event.clientX - container.left, 0, container.width);
+    const y = clamp(event.clientY - container.top, 0, container.height);
+    setDrawStart({ x, y });
+    setDraftRect({ x, y, w: 0, h: 0 });
+  }
+
+  function onOverlayPointerMove(event: ReactPointerEvent<HTMLDivElement>) {
+    if (!drawStart) return;
+    const container = event.currentTarget.getBoundingClientRect();
+    const cx = clamp(event.clientX - container.left, 0, container.width);
+    const cy = clamp(event.clientY - container.top, 0, container.height);
+    const x = Math.min(drawStart.x, cx);
+    const y = Math.min(drawStart.y, cy);
+    const w = Math.abs(cx - drawStart.x);
+    const h = Math.abs(cy - drawStart.y);
+    setDraftRect({ x, y, w, h });
+  }
+
+  function onOverlayPointerUp() {
+    if (draftRect && draftRect.w > 5 && draftRect.h > 5) {
+      updateBboxFromDisplayRect(draftRect);
+    }
+    setDrawStart(null);
+    setDraftRect(null);
+  }
 
   async function syncBookListWitnesses() {
     setBusy(true);
@@ -136,6 +255,7 @@ export default function ManuscriptsPage() {
       return;
     }
     await loadWitnesses();
+    await loadGateSnapshots();
     setMessage("Witnesses synced from prioritized source list.");
     setBusy(false);
   }
@@ -152,16 +272,40 @@ export default function ManuscriptsPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ witnessId: selectedWitnessId, directoryPath: directoryPath.trim() }),
     });
-    const payload = (await response.json()) as { imported?: number; error?: string };
+    const payload = (await response.json()) as {
+      imported?: number;
+      summary?: { ok: number; partial: number; unavailable: number; failed: number };
+      blockers?: Array<{ detail: string }>;
+      error?: string;
+    };
     if (!response.ok) {
-      setMessage(payload.error ?? "Import failed.");
+      if (payload.blockers?.length) {
+        setMessage(`Import blocked: ${payload.blockers[0].detail}`);
+      } else {
+        setMessage(payload.error ?? "Import failed.");
+      }
       setBusy(false);
       return;
     }
     await loadPages(selectedWitnessId);
     await loadProgress(selectedWitnessId);
-    setMessage(`Imported ${payload.imported ?? 0} files.`);
+    await loadGateSnapshots();
+    const summary = payload.summary;
+    setMessage(
+      `Imported ${payload.imported ?? 0} files${summary ? ` (ok:${summary.ok} partial:${summary.partial} unavailable:${summary.unavailable} failed:${summary.failed})` : ""}.`,
+    );
     setBusy(false);
+  }
+
+  function loadRegionIntoEditor(region: Region) {
+    setEditingRegionId(region.id);
+    setStartVerseId(region.startVerseId ?? "");
+    setEndVerseId(region.endVerseId ?? "");
+    setStatus(region.status);
+    setBboxX(String(region.bbox.x));
+    setBboxY(String(region.bbox.y));
+    setBboxW(String(region.bbox.w));
+    setBboxH(String(region.bbox.h));
   }
 
   async function saveRegion() {
@@ -174,8 +318,9 @@ export default function ManuscriptsPage() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        id: editingRegionId ?? undefined,
         pageId: selectedPageId,
-        regionIndex: regions.length + 1,
+        regionIndex: editingRegionId ? regions.find((r) => r.id === editingRegionId)?.regionIndex ?? regions.length + 1 : regions.length + 1,
         bbox: { x: Number(bboxX), y: Number(bboxY), w: Number(bboxW), h: Number(bboxH) },
         startVerseId: startVerseId.trim() || null,
         endVerseId: endVerseId.trim() || null,
@@ -188,9 +333,26 @@ export default function ManuscriptsPage() {
       setBusy(false);
       return;
     }
+    setEditingRegionId(null);
     await loadRegions(selectedPageId);
     await loadProgress(selectedWitnessId);
     setMessage("Region saved.");
+    setBusy(false);
+  }
+
+  async function deleteRegion(regionId: string) {
+    setBusy(true);
+    const response = await fetch(`/api/manuscripts/regions/${encodeURIComponent(regionId)}`, { method: "DELETE" });
+    const payload = (await response.json()) as { error?: string };
+    if (!response.ok) {
+      setMessage(payload.error ?? "Delete failed.");
+      setBusy(false);
+      return;
+    }
+    if (editingRegionId === regionId) setEditingRegionId(null);
+    await loadRegions(selectedPageId);
+    await loadProgress(selectedWitnessId);
+    setMessage("Region deleted.");
     setBusy(false);
   }
 
@@ -201,27 +363,28 @@ export default function ManuscriptsPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ regionId }),
     });
-    const payload = (await response.json()) as { error?: string };
+    const payload = (await response.json()) as { error?: string; blockers?: Array<{ detail: string }> };
     if (!response.ok) {
-      setMessage(payload.error ?? "OCR failed.");
+      setMessage(payload.blockers?.[0]?.detail ?? payload.error ?? "OCR failed.");
       setBusy(false);
       return;
     }
+    await loadProgress(selectedWitnessId);
+    await loadGateSnapshots();
     setMessage(`OCR completed for ${regionId}.`);
     setBusy(false);
   }
 
   async function splitRegion(regionId: string) {
     setBusy(true);
-    const response = await fetch(`/api/manuscripts/regions/${encodeURIComponent(regionId)}/split`, {
-      method: "POST",
-    });
-    const payload = (await response.json()) as { error?: string };
+    const response = await fetch(`/api/manuscripts/regions/${encodeURIComponent(regionId)}/split`, { method: "POST" });
+    const payload = (await response.json()) as { error?: string; blockers?: Array<{ detail: string }> };
     if (!response.ok) {
-      setMessage(payload.error ?? "Split failed.");
+      setMessage(payload.blockers?.[0]?.detail ?? payload.error ?? "Split failed.");
       setBusy(false);
       return;
     }
+    await loadGateSnapshots();
     setMessage(`Split completed for ${regionId}.`);
     setBusy(false);
   }
@@ -235,25 +398,26 @@ export default function ManuscriptsPage() {
     const confidence = await fetch("/api/manuscripts/confidence/recompute", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ verseId: pipelineVerseId.trim() }),
+      body: JSON.stringify({ verseId: pipelineVerseId.trim(), witnessId: selectedWitnessId }),
     });
-    const confidencePayload = (await confidence.json()) as { error?: string };
+    const confidencePayload = (await confidence.json()) as { error?: string; blockers?: Array<{ detail: string }> };
     if (!confidence.ok) {
-      setMessage(confidencePayload.error ?? "Confidence recompute failed.");
+      setMessage(confidencePayload.blockers?.[0]?.detail ?? confidencePayload.error ?? "Confidence recompute failed.");
       setBusy(false);
       return;
     }
     const cascade = await fetch("/api/manuscripts/cascade/recompute", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ verseId: pipelineVerseId.trim() }),
+      body: JSON.stringify({ verseId: pipelineVerseId.trim(), witnessId: selectedWitnessId }),
     });
-    const cascadePayload = (await cascade.json()) as { error?: string };
+    const cascadePayload = (await cascade.json()) as { error?: string; blockers?: Array<{ detail: string }> };
     if (!cascade.ok) {
-      setMessage(cascadePayload.error ?? "Cascade recompute failed.");
+      setMessage(cascadePayload.blockers?.[0]?.detail ?? cascadePayload.error ?? "Cascade recompute failed.");
       setBusy(false);
       return;
     }
+    await loadGateSnapshots();
     setMessage(`Confidence + cascade recomputed for ${pipelineVerseId.trim()}.`);
     setBusy(false);
   }
@@ -262,7 +426,7 @@ export default function ManuscriptsPage() {
     <main className="reading-main">
       <section className="panel">
         <h2>Manuscript Import</h2>
-        <p className="small">Priority follows book_sources/book_list.csv (P1 → P12).</p>
+        <p className="small">Priority follows book_sources/book_list.csv (P1 → P12). Use arrow keys for page nav, Ctrl/Cmd+S to save region.</p>
         {message ? <p className="small">{message}</p> : null}
 
         <div className="reading-controls-row">
@@ -273,12 +437,7 @@ export default function ManuscriptsPage() {
 
         <div className="reading-controls-row">
           <label htmlFor="witness-select">Witness</label>
-          <select
-            id="witness-select"
-            value={selectedWitnessId}
-            onChange={(event) => setSelectedWitnessId(event.target.value)}
-            disabled={busy}
-          >
+          <select id="witness-select" value={selectedWitnessId} onChange={(event) => setSelectedWitnessId(event.target.value)} disabled={busy}>
             {witnesses.map((witness) => (
               <option key={witness.id} value={witness.id}>
                 P{witness.sourcePriority ?? "-"} {witness.name}
@@ -318,6 +477,14 @@ export default function ManuscriptsPage() {
             Progress: {progress.pagesAnnotated}/{progress.totalPages} pages annotated, {progress.regionsPendingOcr} regions pending OCR.
           </p>
         ) : null}
+
+        {selectedGate ? (
+          <div className="small" style={{ marginTop: "0.5rem" }}>
+            <div>Gate states: ingest={selectedGate.runState.ingestStatus} ocr={selectedGate.runState.ocrStatus} split={selectedGate.runState.splitStatus} confidence={selectedGate.runState.confidenceStatus}</div>
+            {selectedGate.runState.blockers.length > 0 ? <div>Blocker: {selectedGate.runState.blockers[0].detail}</div> : null}
+          </div>
+        ) : null}
+
         <div className="reading-controls-row">
           <label htmlFor="pipeline-verse-id">Verse for confidence/cascade</label>
           <input
@@ -334,31 +501,7 @@ export default function ManuscriptsPage() {
       </section>
 
       <section className="panel">
-        <h3>Witness Details</h3>
-        {selectedWitness ? (
-          <div className="small">
-            <div>ID: {selectedWitness.id}</div>
-            <div>Priority: {selectedWitness.sourcePriority ?? "N/A"}</div>
-            <div>Authority weight: {selectedWitness.authorityWeight}</div>
-            <div>Type: {selectedWitness.type}</div>
-            <div>
-              Source link:{" "}
-              {selectedWitness.sourceLink ? (
-                <a href={selectedWitness.sourceLink} target="_blank" rel="noreferrer">
-                  {selectedWitness.sourceLink}
-                </a>
-              ) : (
-                "N/A"
-              )}
-            </div>
-          </div>
-        ) : (
-          <p className="small">No witness selected.</p>
-        )}
-      </section>
-
-      <section className="panel">
-        <h3>Region Annotation (MVP)</h3>
+        <h3>Draw Region Annotator</h3>
         <div className="reading-controls-row">
           <label htmlFor="start-verse">Start verse_id</label>
           <input id="start-verse" type="text" value={startVerseId} onChange={(event) => setStartVerseId(event.target.value)} />
@@ -383,21 +526,64 @@ export default function ManuscriptsPage() {
           <input value={bboxW} onChange={(event) => setBboxW(event.target.value)} />
           <input value={bboxH} onChange={(event) => setBboxH(event.target.value)} />
           <button type="button" onClick={saveRegion} disabled={busy}>
-            Save Region
+            {editingRegionId ? "Update Region" : "Save Region"}
           </button>
         </div>
+
+        <div className="annotator-wrap">
+          {selectedPage && selectedPage.imagePath.match(/\.(png|jpg|jpeg|webp|tif|tiff)$/i) ? (
+            <div
+              className="annotator-canvas"
+              onPointerDown={onOverlayPointerDown}
+              onPointerMove={onOverlayPointerMove}
+              onPointerUp={onOverlayPointerUp}
+              onPointerLeave={onOverlayPointerUp}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img ref={imageRef} src={selectedPage.imagePath} alt={`Page ${selectedPage.pageIndex}`} className="annotator-image" />
+              {regions.map((region) => {
+                const rect = regionToDisplayRect(region);
+                if (!rect) return null;
+                return (
+                  <button
+                    key={region.id}
+                    type="button"
+                    className={`annotator-region ${editingRegionId === region.id ? "active" : ""}`}
+                    style={{ left: rect.left, top: rect.top, width: rect.width, height: rect.height }}
+                    onClick={() => loadRegionIntoEditor(region)}
+                  >
+                    <span className="handle tl" />
+                    <span className="handle tr" />
+                    <span className="handle bl" />
+                    <span className="handle br" />
+                    <span className="annotator-region-label">#{region.regionIndex}</span>
+                  </button>
+                );
+              })}
+              {draftRect ? (
+                <div className="annotator-draft" style={{ left: draftRect.x, top: draftRect.y, width: draftRect.w, height: draftRect.h }} />
+              ) : null}
+            </div>
+          ) : (
+            <p className="small">Select an image page to draw rectangles.</p>
+          )}
+        </div>
+
         {regions.length > 0 ? (
           <div className="small">
             {regions.map((region) => (
-              <div key={region.id}>
-                #{region.regionIndex} [{region.status}] {region.startVerseId ?? "-"} to {region.endVerseId ?? "-"} bbox(
-                {region.bbox.x},{region.bbox.y},{region.bbox.w},{region.bbox.h})
-                {" "}
-                <button type="button" onClick={() => runOcr(region.id)} disabled={busy}>
+              <div key={region.id} style={{ marginTop: "0.35rem" }}>
+                #{region.regionIndex} [{region.status}] {region.startVerseId ?? "-"} to {region.endVerseId ?? "-"} bbox({region.bbox.x},{region.bbox.y},{region.bbox.w},{region.bbox.h})
+                <button type="button" onClick={() => loadRegionIntoEditor(region)} disabled={busy} style={{ marginLeft: "0.4rem" }}>
+                  Edit
+                </button>
+                <button type="button" onClick={() => deleteRegion(region.id)} disabled={busy} style={{ marginLeft: "0.3rem" }}>
+                  Delete
+                </button>
+                <button type="button" onClick={() => runOcr(region.id)} disabled={busy} style={{ marginLeft: "0.3rem" }}>
                   Run OCR
                 </button>
-                {" "}
-                <button type="button" onClick={() => splitRegion(region.id)} disabled={busy}>
+                <button type="button" onClick={() => splitRegion(region.id)} disabled={busy} style={{ marginLeft: "0.3rem" }}>
                   Split to Verses
                 </button>
               </div>
@@ -409,7 +595,26 @@ export default function ManuscriptsPage() {
       </section>
 
       <section className="panel">
-        <h3>Pages</h3>
+        <h3>Witness Details + Pages</h3>
+        {selectedWitness ? (
+          <div className="small" style={{ marginBottom: "0.6rem" }}>
+            <div>ID: {selectedWitness.id}</div>
+            <div>Priority: {selectedWitness.sourcePriority ?? "N/A"}</div>
+            <div>Authority weight: {selectedWitness.authorityWeight}</div>
+            <div>Type: {selectedWitness.type}</div>
+            <div>
+              Source link:{" "}
+              {selectedWitness.sourceLink ? (
+                <a href={selectedWitness.sourceLink} target="_blank" rel="noreferrer">
+                  {selectedWitness.sourceLink}
+                </a>
+              ) : (
+                "N/A"
+              )}
+            </div>
+          </div>
+        ) : null}
+
         {pages.length === 0 ? <p className="small">No pages imported yet.</p> : null}
         {pages.map((page) => (
           <article key={page.id} className="panel" style={{ marginBottom: "0.75rem" }}>
@@ -417,14 +622,10 @@ export default function ManuscriptsPage() {
               <strong>Page {page.pageIndex}</strong> ({page.status})
             </div>
             <div className="small">{page.imagePath}</div>
-            {page.imagePath.match(/\.(png|jpg|jpeg|webp|tif|tiff)$/i) ? (
+            {page.thumbnailPath ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={page.imagePath} alt={`Page ${page.pageIndex}`} style={{ maxWidth: "100%", marginTop: "0.5rem" }} />
-            ) : (
-              <div className="small" style={{ marginTop: "0.5rem" }}>
-                Non-image source (preview unavailable in browser).
-              </div>
-            )}
+              <img src={page.thumbnailPath} alt={`Thumbnail ${page.pageIndex}`} style={{ maxWidth: "100%", marginTop: "0.35rem" }} />
+            ) : null}
           </article>
         ))}
       </section>

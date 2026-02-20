@@ -38,7 +38,7 @@ export async function POST(request: Request) {
     h: Number(bbox.h ?? NaN),
   };
   if (Object.values(numericBbox).some((value) => Number.isNaN(value))) {
-    return NextResponse.json({ error: "Invalid bbox values." }, { status: 400 });
+    return NextResponse.json({ error: "Invalid bbox values.", errorCode: "INVALID_BBOX" }, { status: 400 });
   }
 
   const repo = getRepository();

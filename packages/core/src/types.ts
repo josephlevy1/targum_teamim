@@ -104,6 +104,8 @@ export interface PatchEntry {
   id: string;
   verseId: VerseId;
   op: PatchOp;
+  sourceType: "manual" | "import" | "automation";
+  sourceWitnessId?: string | null;
   author: string;
   note?: string;
   createdAt: string;

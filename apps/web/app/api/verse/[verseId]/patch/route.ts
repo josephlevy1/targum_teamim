@@ -39,8 +39,17 @@ export async function POST(request: Request, ctx: { params: Promise<{ verseId: s
     }
 
     const note = typeof body.note === "string" ? body.note : undefined;
+    const sourceType =
+      body.sourceType === "import" || body.sourceType === "automation" || body.sourceType === "manual"
+        ? body.sourceType
+        : "manual";
+    const sourceWitnessId =
+      typeof body.sourceWitnessId === "string" && body.sourceWitnessId.trim() ? body.sourceWitnessId.trim() : null;
     const repo = getRepository();
-    const entry = repo.addPatch(verseId as any, parsed.data as any, note, user.username);
+    const entry = repo.addPatch(verseId as any, parsed.data as any, note, user.username, {
+      sourceType,
+      sourceWitnessId,
+    });
     return NextResponse.json(entry);
   } catch (error) {
     const authResponse = authErrorResponse(error);
