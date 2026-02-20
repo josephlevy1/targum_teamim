@@ -21,8 +21,22 @@ describe("manuscript gating policy evaluator", () => {
     for (const status of statuses) {
       const { root, repo } = createTempRepo();
       try {
-        repo.upsertWitness({ id: "p1", name: "P1", type: "scanned_images", authorityWeight: 1, sourcePriority: 1 });
-        repo.upsertWitness({ id: "p2", name: "P2", type: "scanned_images", authorityWeight: 0.9, sourcePriority: 2 });
+        repo.upsertWitness({
+          id: "p1",
+          name: "P1",
+          type: "scanned_images",
+          authorityWeight: 1,
+          sourcePriority: 1,
+          sourceLink: "https://example.org/p1",
+        });
+        repo.upsertWitness({
+          id: "p2",
+          name: "P2",
+          type: "scanned_images",
+          authorityWeight: 0.9,
+          sourcePriority: 2,
+          sourceLink: "https://example.org/p2",
+        });
         repo.setWitnessRunStage({
           witnessId: "p1",
           stage: "ingest",
@@ -43,8 +57,8 @@ describe("manuscript gating policy evaluator", () => {
   it("blocks lower priority when higher priority stage is pending", () => {
     const { root, repo } = createTempRepo();
     try {
-      repo.upsertWitness({ id: "p1", name: "P1", type: "scanned_images", authorityWeight: 1, sourcePriority: 1 });
-      repo.upsertWitness({ id: "p2", name: "P2", type: "scanned_images", authorityWeight: 0.9, sourcePriority: 2 });
+      repo.upsertWitness({ id: "p1", name: "P1", type: "scanned_images", authorityWeight: 1, sourcePriority: 1, sourceLink: "https://example.org/p1" });
+      repo.upsertWitness({ id: "p2", name: "P2", type: "scanned_images", authorityWeight: 0.9, sourcePriority: 2, sourceLink: "https://example.org/p2" });
 
       const gate = evaluateSourceGate({ witnessId: "p2", stage: "ocr" }, repo);
       expect(gate.allowed).toBe(false);
@@ -59,8 +73,8 @@ describe("manuscript gating policy evaluator", () => {
   it("allows with admin override and records overrideUsed", () => {
     const { root, repo } = createTempRepo();
     try {
-      repo.upsertWitness({ id: "p1", name: "P1", type: "scanned_images", authorityWeight: 1, sourcePriority: 1 });
-      repo.upsertWitness({ id: "p2", name: "P2", type: "scanned_images", authorityWeight: 0.9, sourcePriority: 2 });
+      repo.upsertWitness({ id: "p1", name: "P1", type: "scanned_images", authorityWeight: 1, sourcePriority: 1, sourceLink: "https://example.org/p1" });
+      repo.upsertWitness({ id: "p2", name: "P2", type: "scanned_images", authorityWeight: 0.9, sourcePriority: 2, sourceLink: "https://example.org/p2" });
 
       const gate = evaluateSourceGate({ witnessId: "p2", stage: "split", adminOverride: true, actor: "admin" }, repo);
       expect(gate.allowed).toBe(true);
@@ -78,8 +92,8 @@ describe("manuscript gating policy evaluator", () => {
   it("rejects lower-priority confidence run while higher priority is failed", () => {
     const { root, repo } = createTempRepo();
     try {
-      repo.upsertWitness({ id: "p1", name: "P1", type: "scanned_images", authorityWeight: 1, sourcePriority: 1 });
-      repo.upsertWitness({ id: "p2", name: "P2", type: "scanned_images", authorityWeight: 0.9, sourcePriority: 2 });
+      repo.upsertWitness({ id: "p1", name: "P1", type: "scanned_images", authorityWeight: 1, sourcePriority: 1, sourceLink: "https://example.org/p1" });
+      repo.upsertWitness({ id: "p2", name: "P2", type: "scanned_images", authorityWeight: 0.9, sourcePriority: 2, sourceLink: "https://example.org/p2" });
 
       repo.setWitnessRunStage({
         witnessId: "p1",
@@ -107,6 +121,7 @@ describe("manuscript gating policy evaluator", () => {
           type: "scanned_images",
           authorityWeight: 1 - i * 0.01,
           sourcePriority: i,
+          sourceLink: `https://example.org/p${i}`,
         });
       }
 

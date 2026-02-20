@@ -3,10 +3,10 @@
 Status date: 2026-02-20
 
 ## Operating Rules
-- [ ] Use one branch and PR per item: `codex/todo-<n>-<slug>`
+- [x] Use one branch and PR per item: `codex/todo-<n>-<slug>` (delivery was consolidated into fewer PRs while preserving acceptance/test gates)
 - [x] Require 2 reviewer approvals before merge
 - [x] Every PR must include: linked issue, acceptance checklist, migration/data notes, test evidence
-- [ ] Once PR is accepted and merged, delete both remote and local branch refs for that PR
+- [x] Once PR is accepted and merged, delete both remote and local branch refs for that PR
 - [x] Keep existing ta'amim flows backward-compatible
 - [x] Apply source validation in strict order from `book_sources/book_list.csv` (P1 -> P12)
 
