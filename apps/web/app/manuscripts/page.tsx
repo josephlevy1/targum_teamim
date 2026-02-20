@@ -404,6 +404,9 @@ export default function ManuscriptsPage() {
 
       <section className="panel">
         <h3>Region Annotation (MVP)</h3>
+        <p className="small">
+          Manual boundary adjuster fallback: update `start_verse_id` / `end_verse_id` values, save region, then re-run split.
+        </p>
         <div className="reading-controls-row">
           <label htmlFor="start-verse">Start verse_id</label>
           <input id="start-verse" type="text" value={startVerseId} onChange={(event) => setStartVerseId(event.target.value)} />
