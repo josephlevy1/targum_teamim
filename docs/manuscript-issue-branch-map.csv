@@ -1,0 +1,34 @@
+issue_number,title,branch_name,status
+5,"Issue 0.1 — Define core entities and naming conventions",codex/issue-5-define-core-entities-and-naming-conventions,implemented_in_worktree
+6,"Issue 0.2 — Add migrations/DB scaffolding for new tables",codex/issue-6-add-migrations-db-scaffolding-for-new-tables,implemented_in_worktree
+7,"Issue 1.1 — Witness Registry UI + API",codex/issue-7-witness-registry-ui-api,implemented_in_worktree
+8,"Issue 1.2 — Page Image Import (directory ingest)",codex/issue-8-page-image-import-directory-ingest,implemented_in_worktree
+9,"Issue 1.3 — Page Viewer (baseline tool)",codex/issue-9-page-viewer-baseline-tool,implemented_in_worktree
+10,"Issue 2.1 — Page Annotator: draw region rectangles",codex/issue-10-page-annotator-draw-region-rectangles,implemented_in_worktree
+11,"Issue 2.2 — Tag regions with verse ranges + status",codex/issue-11-tag-regions-with-verse-ranges-status,implemented_in_worktree
+12,"Issue 2.3 — Region queue + progress tracking",codex/issue-12-region-queue-progress-tracking,implemented_in_worktree
+13,"Issue 3.1 — Crop pipeline for regions",codex/issue-13-crop-pipeline-for-regions,implemented_in_worktree
+14,"Issue 3.2 — OCR runner (block OCR)",codex/issue-14-ocr-runner-block-ocr,implemented_in_worktree
+15,"Issue 3.3 — Normalization module",codex/issue-15-normalization-module,implemented_in_worktree
+16,"Issue 4.1 — Baseline scaffold loader",codex/issue-16-baseline-scaffold-loader,implemented_in_worktree
+17,"Issue 4.2 — Region-to-verse splitter using baseline alignment",codex/issue-17-region-to-verse-splitter-using-baseline-alignment,implemented_in_worktree
+18,"Issue 4.3 — Alignment metrics + diff artifacts (witness vs baseline)",codex/issue-18-alignment-metrics-diff-artifacts-witness-vs-baseline,implemented_in_worktree
+19,"Issue 4.4 — Manual boundary adjuster (fallback)",codex/issue-19-manual-boundary-adjuster-fallback,implemented_in_worktree
+20,"Issue 5.1 — Per-witness-verse confidence model",codex/issue-20-per-witness-verse-confidence-model,implemented_in_worktree
+21,"Issue 5.2 — Ensemble confidence + disagreement detection",codex/issue-21-ensemble-confidence-disagreement-detection,implemented_in_worktree
+22,"Issue 5.3 — Cascade selector (Vatican → HebrewBooks → baseline)",codex/issue-22-cascade-selector-vatican-hebrewbooks-baseline,implemented_in_worktree
+23,"Issue 6.1 — Witness panel in verse editor",codex/issue-23-witness-panel-in-verse-editor,implemented_in_worktree
+24,"Issue 6.2 — Diff viewer component",codex/issue-24-diff-viewer-component,implemented_in_worktree
+25,"Issue 6.3 — Review queues integration",codex/issue-25-review-queues-integration,implemented_in_worktree
+26,"Issue 7.1 — Working verse text persistence",codex/issue-26-working-verse-text-persistence,implemented_in_worktree
+27,"Issue 7.2 — Base text patches (audit trail)",codex/issue-27-base-text-patches-audit-trail,implemented_in_worktree
+28,"Issue 7.3 — Undo/redo for base text selection/edits (MVP)",codex/issue-28-undo-redo-for-base-text-selection-edits-mvp,implemented_in_worktree
+29,"Issue 8.1 — Export working Aramaic text (deterministic Unicode)",codex/issue-29-export-working-aramaic-text-deterministic-unicode,implemented_in_worktree
+30,"Issue 8.2 — Export confidence report (JSON)",codex/issue-30-export-confidence-report-json,implemented_in_worktree
+31,"Issue 8.3 — Export witness diffs (optional)",codex/issue-31-export-witness-diffs-optional,implemented_in_worktree
+32,"Issue 9.1 — Auto block detection (propose rectangles)",codex/issue-32-auto-block-detection-propose-rectangles,implemented_in_worktree
+33,"Issue 9.2 — Auto verse-range proposal (OCR page + align)",codex/issue-33-auto-verse-range-proposal-ocr-page-align,implemented_in_worktree
+34,"Issue 9.3 — Active learning loop (optional)",codex/issue-34-active-learning-loop-optional,implemented_in_worktree
+35,"Issue 10.1 — Job monitoring + retries",codex/issue-35-job-monitoring-retries,implemented_in_worktree
+36,"Issue 10.2 — Caching + performance",codex/issue-36-caching-performance,implemented_in_worktree
+37,"Issue 10.3 — Test suite (unit + integration)",codex/issue-37-test-suite-unit-integration,implemented_in_worktree

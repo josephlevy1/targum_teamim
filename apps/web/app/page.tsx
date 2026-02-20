@@ -39,7 +39,14 @@ type ParsedVerseRef = {
 };
 
 type VerseSortMode = "sequential" | "confidence_desc" | "confidence_asc";
-type VerseFilterMode = "all" | "verified" | "pending" | "flagged";
+type VerseFilterMode =
+  | "all"
+  | "verified"
+  | "pending"
+  | "flagged"
+  | "text_low_confidence"
+  | "text_disagreement"
+  | "text_unavailable";
 
 const TAAM_REPLACEMENTS: Array<{ name: string; unicodeMark: string; tier: Tier }> = [
   { name: "MUNAH", unicodeMark: "֣", tier: "CONJUNCTIVE" },
@@ -144,6 +151,7 @@ function HomePageInner() {
   const [didHydrateFromQuery, setDidHydrateFromQuery] = useState(false);
   const [verseSortMode, setVerseSortMode] = useState<VerseSortMode>("sequential");
   const [verseFilterMode, setVerseFilterMode] = useState<VerseFilterMode>("all");
+  const [textQueueVerseIds, setTextQueueVerseIds] = useState<Set<string>>(new Set());
   const [record, setRecord] = useState<VerseRecord | null>(null);
   const [selectedTaamId, setSelectedTaamId] = useState<string | null>(null);
   const [activeToken, setActiveToken] = useState<number | null>(null);
@@ -287,9 +295,12 @@ function HomePageInner() {
         if (verseFilterMode === "verified") return item.verified;
         if (verseFilterMode === "pending") return !item.verified;
         if (verseFilterMode === "flagged") return item.flagged;
+        if (verseFilterMode === "text_low_confidence" || verseFilterMode === "text_disagreement" || verseFilterMode === "text_unavailable") {
+          return textQueueVerseIds.has(item.verseId);
+        }
         return true;
       }).length,
-    [verseFilterMode, verseItemsWithRef],
+    [textQueueVerseIds, verseFilterMode, verseItemsWithRef],
   );
   const visibleVerseItems = useMemo(() => {
     const compareRefs = (a: ParsedVerseRef, b: ParsedVerseRef) => compareVerseIdsCanonical(a.id, b.id);
@@ -298,12 +309,22 @@ function HomePageInner() {
       if (verseFilterMode === "verified") return item.verified;
       if (verseFilterMode === "pending") return !item.verified;
       if (verseFilterMode === "flagged") return item.flagged;
+      if (verseFilterMode === "text_low_confidence" || verseFilterMode === "text_disagreement" || verseFilterMode === "text_unavailable") {
+        return textQueueVerseIds.has(item.verseId);
+      }
       return true;
     });
 
     if (verseSortMode === "sequential") {
       const inOrder = filtered.slice().sort((a, b) => compareRefs(a.ref, b.ref));
-      if (verseFilterMode === "flagged") return inOrder;
+      if (
+        verseFilterMode === "flagged" ||
+        verseFilterMode === "text_low_confidence" ||
+        verseFilterMode === "text_disagreement" ||
+        verseFilterMode === "text_unavailable"
+      ) {
+        return inOrder;
+      }
       if (!selectedVerseRef) return inOrder.slice(0, 20);
       const currentIndex = inOrder.findIndex((item) => item.verseId === verseId);
       const insertionIndex =
@@ -322,9 +343,40 @@ function HomePageInner() {
         }
         return (a.avgConfidence - b.avgConfidence) * direction;
       });
-    if (verseFilterMode === "flagged") return sorted;
+    if (
+      verseFilterMode === "flagged" ||
+      verseFilterMode === "text_low_confidence" ||
+      verseFilterMode === "text_disagreement" ||
+      verseFilterMode === "text_unavailable"
+    ) {
+      return sorted;
+    }
     return sorted.slice(0, 20);
-  }, [verseFilterMode, verseItemsWithRef, verseSortMode, selectedVerseRef]);
+  }, [textQueueVerseIds, verseFilterMode, verseItemsWithRef, verseSortMode, selectedVerseRef]);
+
+  useEffect(() => {
+    async function loadTextQueue() {
+      let filter: "low_confidence" | "disagreement" | "unavailable_partial" | null = null;
+      if (verseFilterMode === "text_low_confidence") filter = "low_confidence";
+      if (verseFilterMode === "text_disagreement") filter = "disagreement";
+      if (verseFilterMode === "text_unavailable") filter = "unavailable_partial";
+      if (!filter) {
+        setTextQueueVerseIds(new Set());
+        return;
+      }
+
+      const response = await fetch(`/api/manuscripts/review-queue?filter=${encodeURIComponent(filter)}`);
+      const payload = (await response.json()) as { items?: Array<{ verseId: string }>; error?: string };
+      if (!response.ok) {
+        setUiMessage({ type: "error", text: payload.error ?? "Failed to load text review queue." });
+        setTextQueueVerseIds(new Set());
+        return;
+      }
+      setTextQueueVerseIds(new Set((payload.items ?? []).map((item) => item.verseId)));
+    }
+
+    void loadTextQueue();
+  }, [verseFilterMode]);
 
   async function refreshVerses() {
     const res = await fetch("/api/verses");
@@ -975,9 +1027,30 @@ function HomePageInner() {
             >
               Flagged
             </button>
+            <button
+              className={`subtle nav-filter-btn ${verseFilterMode === "text_low_confidence" ? "active" : ""}`}
+              onClick={() => setVerseFilterMode("text_low_confidence")}
+            >
+              Low Text
+            </button>
+            <button
+              className={`subtle nav-filter-btn ${verseFilterMode === "text_disagreement" ? "active" : ""}`}
+              onClick={() => setVerseFilterMode("text_disagreement")}
+            >
+              Disagree
+            </button>
+            <button
+              className={`subtle nav-filter-btn ${verseFilterMode === "text_unavailable" ? "active" : ""}`}
+              onClick={() => setVerseFilterMode("text_unavailable")}
+            >
+              Unavailable
+            </button>
           </div>
           <div className="small nav-meta compact-top">
-            {verseFilterMode === "flagged"
+            {verseFilterMode === "flagged" ||
+            verseFilterMode === "text_low_confidence" ||
+            verseFilterMode === "text_disagreement" ||
+            verseFilterMode === "text_unavailable"
               ? `Showing ${visibleVerseItems.length} of ${filteredVerseCount}`
               : `Showing top ${visibleVerseItems.length} of ${filteredVerseCount}`}
           </div>

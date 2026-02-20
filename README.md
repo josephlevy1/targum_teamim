@@ -98,6 +98,11 @@ Read endpoints (public):
 - `GET /api/reading?book=Genesis&chapter=1`
 - `GET /api/export/json?range=Genesis:1:1-Genesis:1:31`
 - `GET /api/export/unicode?range=Genesis:1:1-Genesis:1:31`
+- `GET /api/manuscripts/sources`
+- `GET /api/manuscripts/witnesses`
+- `GET /api/manuscripts/pages?witnessId=<id>`
+- `GET /api/manuscripts/regions?pageId=<id>`
+- `GET /api/manuscripts/progress?witnessId=<id>`
 
 Import endpoints:
 
@@ -113,6 +118,28 @@ Mutation endpoints (Clerk sign-in required):
 - `POST /api/verse/:verseId/reset`
 - `POST /api/verse/:verseId/verify`
 - `POST /api/verse/:verseId/flag`
+- `POST /api/manuscripts/witnesses` (`action=sync_book_list` or create witness)
+- `POST /api/manuscripts/pages/import`
+- `POST /api/manuscripts/regions`
+- `DELETE /api/manuscripts/regions/:regionId`
+- `POST /api/manuscripts/ocr/run`
+- `POST /api/manuscripts/split/run`
+- `POST /api/manuscripts/confidence/recompute`
+- `POST /api/manuscripts/cascade/recompute`
+- `POST /api/manuscripts/verse/:verseId/select`
+- `POST /api/manuscripts/verse/:verseId/undo`
+- `POST /api/manuscripts/verse/:verseId/redo`
+- `POST /api/manuscripts/regions/:regionId/split`
+
+Manuscript exports/review:
+
+- `GET /api/manuscripts/verse/:verseId/witnesses`
+- `GET /api/manuscripts/verse/:verseId/patches`
+- `GET /api/manuscripts/review-queue?filter=low_confidence|disagreement|unavailable_partial`
+- `GET /api/manuscripts/export/working-text`
+- `GET /api/manuscripts/export/confidence`
+- `GET /api/manuscripts/export/diffs`
+- `GET /api/manuscripts/jobs/ocr`
 
 When signed out, mutation routes return `401`. Patch entries are attributed to Clerk username (fallback to email local-part, then user-id prefix).
 
