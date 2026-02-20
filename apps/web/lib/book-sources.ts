@@ -12,6 +12,105 @@ export interface BookSourceRow {
   priority: number;
 }
 
+const FALLBACK_BOOK_SOURCES: BookSourceRow[] = [
+  {
+    referenceName: "Biblia Vetus Testamentum Pentateuchus",
+    link: "https://digi.vatlib.it/view/MSS_Vat.ebr.448",
+    fileName: "NA",
+    location: "Spain",
+    year: 1200,
+    priority: 1,
+  },
+  {
+    referenceName: "Vat.ebr.19",
+    link: "https://digi.vatlib.it/view/MSS_Vat.ebr.19",
+    fileName: "NA",
+    location: "North Africa",
+    year: 1500,
+    priority: 2,
+  },
+  {
+    referenceName: "Lisbon 45803",
+    link: "https://www.hebrewbooks.org/45803",
+    fileName: "Hebrewbooks_org_45803.pdf",
+    location: "Lisbon",
+    year: 1491,
+    priority: 3,
+  },
+  {
+    referenceName: "Venice 22405",
+    link: "https://www.hebrewbooks.org/22405",
+    fileName: "Hebrewbooks_org_22405.pdf",
+    location: "Venice",
+    year: 1518,
+    priority: 4,
+  },
+  {
+    referenceName: "Venice 42687",
+    link: "https://www.hebrewbooks.org/42687",
+    fileName: "Hebrewbooks_org_42687.pdf",
+    location: "Venice",
+    year: 1547,
+    priority: 5,
+  },
+  {
+    referenceName: "Chumash Sevyoniti",
+    link: "https://www.hebrewbooks.org/21711",
+    fileName: "Hebrewbooks_org_21711.pdf",
+    location: "Sabbioneta",
+    year: 1557,
+    priority: 6,
+  },
+  {
+    referenceName: "Sixth Biblia Rabbinica",
+    link: "https://www.hebrewbooks.org/43164",
+    fileName: "Hebrewbooks_org_43164.pdf",
+    location: "Basel",
+    year: 1618,
+    priority: 7,
+  },
+  {
+    referenceName: "Amsterdam 42117",
+    link: "https://www.hebrewbooks.org/42117",
+    fileName: "Hebrewbooks_org_42117.pdf",
+    location: "Amsterdam",
+    year: 1680,
+    priority: 8,
+  },
+  {
+    referenceName: "Amsterdam 42118",
+    link: "https://www.hebrewbooks.org/42118",
+    fileName: "Hebrewbooks_org_42118.pdf",
+    location: "Amsterdam",
+    year: 1682,
+    priority: 9,
+  },
+  {
+    referenceName: "Frankfurt 42329",
+    link: "https://www.hebrewbooks.org/42329",
+    fileName: "Hebrewbooks_org_42329.pdf",
+    location: "Frankfurt",
+    year: 1728,
+    priority: 10,
+  },
+  {
+    referenceName: "Amsterdam 42735",
+    link: "https://www.hebrewbooks.org/42735",
+    fileName: "Hebrewbooks_org_42735.pdf",
+    location: "Amsterdam",
+    year: 1749,
+    priority: 11,
+  },
+  {
+    referenceName: "Amsterdam 42071",
+    link: "https://www.hebrewbooks.org/42071",
+    fileName: "Hebrewbooks_org_42071.pdf",
+    location: "Amsterdam",
+    year: 1757,
+    priority: 12,
+  },
+];
+
 function getBookListPath(): string {
   const cwd = process.cwd();
   const webSuffix = `${path.sep}apps${path.sep}web`;
@@ -37,6 +136,9 @@ function authorityWeightForPriority(priority: number): number {
 
 export function readBookSources(): BookSourceRow[] {
   const filePath = getBookListPath();
+  if (!fs.existsSync(filePath)) {
+    return [...FALLBACK_BOOK_SOURCES].sort((a, b) => a.priority - b.priority);
+  }
   const text = fs.readFileSync(filePath, "utf8");
   const lines = text
     .split(/\r?\n/)
