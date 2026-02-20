@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isCanonicalVerseId } from "@targum/core";
 import { authErrorResponse, requireEditorUser } from "@/lib/authz";
 import { getRepository } from "@/lib/repository";
 
@@ -41,14 +42,23 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid bbox values." }, { status: 400 });
   }
 
+  const startVerseId = payload.startVerseId ? String(payload.startVerseId) : null;
+  const endVerseId = payload.endVerseId ? String(payload.endVerseId) : null;
+  if (startVerseId && !isCanonicalVerseId(startVerseId)) {
+    return NextResponse.json({ error: "startVerseId must be canonical (Book:Chapter:Verse)." }, { status: 400 });
+  }
+  if (endVerseId && !isCanonicalVerseId(endVerseId)) {
+    return NextResponse.json({ error: "endVerseId must be canonical (Book:Chapter:Verse)." }, { status: 400 });
+  }
+
   const repo = getRepository();
   const region = repo.upsertPageRegion({
     id: payload.id ? String(payload.id) : undefined,
     pageId,
     regionIndex,
     bbox: numericBbox,
-    startVerseId: payload.startVerseId ? String(payload.startVerseId) : null,
-    endVerseId: payload.endVerseId ? String(payload.endVerseId) : null,
+    startVerseId,
+    endVerseId,
     status: payload.status as "ok" | "partial" | "unavailable" | "failed" | undefined,
     notes: payload.notes ? String(payload.notes) : "",
   });
