@@ -1,8 +1,10 @@
 "use client";
 
+import { memo } from "react";
+
 type DiffOp = { op: "equal" | "replace" | "insert" | "delete"; a?: string; b?: string };
 
-export function WitnessDiff({ ops }: { ops: DiffOp[] }) {
+function WitnessDiffImpl({ ops }: { ops: DiffOp[] }) {
   return (
     <div className="small" style={{ lineHeight: 1.8 }}>
       {ops.map((op, idx) => {
@@ -37,3 +39,5 @@ export function WitnessDiff({ ops }: { ops: DiffOp[] }) {
     </div>
   );
 }
+
+export const WitnessDiff = memo(WitnessDiffImpl);
