@@ -123,4 +123,4 @@ Status date: 2026-02-20
 - [x] All required PR checks pass and policy gate is enforced
 
 ## Open Items (Remaining)
-- [ ] Run and document the initial real 10-20 page calibration pass with actual manuscript assets (current calibration used synthetic data; direct HebrewBooks fetch currently returns Cloudflare 403 in non-interactive CLI).
+- [x] Run and document the initial real 10-20 page calibration pass with actual manuscript assets (implemented from local `/book_sources` PDFs).

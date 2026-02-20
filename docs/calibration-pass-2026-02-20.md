@@ -1,7 +1,19 @@
 # Calibration Pass Report (2026-02-20)
 
-- Dataset: synthetic 10-page manuscript calibration set
-- Witness: calibration_synthetic_p1
+- Dataset: local PDFs from /book_sources (first page from each selected PDF)
+- Source PDFs:
+  - Hebrewbooks_org_45803.pdf
+  - Hebrewbooks_org_22405.pdf
+  - Hebrewbooks_org_42687.pdf
+  - Hebrewbooks_org_21711.pdf
+  - Hebrewbooks_org_43164.pdf
+  - Hebrewbooks_org_42117.pdf
+  - Hebrewbooks_org_42118.pdf
+  - Hebrewbooks_org_42329.pdf
+  - Hebrewbooks_org_42735.pdf
+  - Hebrewbooks_org_42071.pdf
+- Witness: calibration_book_sources_p1
+- OCR engine: command-json-mock
 - Pages processed: 10
 
 ## Results
@@ -12,5 +24,4 @@
 
 ## Notes
 - Flow executed end-to-end: ingest -> region annotate -> OCR -> split.
-- OCR runner used command-json mock for calibration repeatability.
-- Replace with real manuscript assets for production calibration and threshold tuning.
+- Input pages were derived from local /book_sources PDFs (no network fetch).
