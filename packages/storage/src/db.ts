@@ -69,6 +69,7 @@ export interface PageRegionRecord {
 export interface RegionOcrArtifact {
   regionId: string;
   cropPath: string;
+  cropMetadata: Record<string, unknown>;
   textRaw: string;
   ocrMeanConf: number;
   ocrCharCount: number;
@@ -136,6 +137,39 @@ export interface OcrJobRecord {
   finishedAt?: string;
 }
 
+export type RunStage = "ingest" | "ocr" | "split" | "confidence";
+export type RunStageStatus = "pending" | "running" | "completed" | "failed" | "blocked";
+
+export interface RunBlocker {
+  stage: RunStage;
+  blockerWitnessId: string;
+  blockerPriority: number;
+  reasonCode: string;
+  detail: string;
+}
+
+export interface WitnessRunStateRecord {
+  witnessId: string;
+  ingestStatus: RunStageStatus;
+  ocrStatus: RunStageStatus;
+  splitStatus: RunStageStatus;
+  confidenceStatus: RunStageStatus;
+  blockers: RunBlocker[];
+  updatedAt: string;
+}
+
+export interface AutomationFeedbackRecord {
+  id: string;
+  pageId: string;
+  proposalType: "blocks" | "ranges";
+  proposalId: string;
+  accepted: boolean;
+  confidence: number;
+  hasGroundTruth: boolean;
+  createdAt: string;
+  actor: string;
+}
+
 function ensureDir(dir: string): void {
   fs.mkdirSync(dir, { recursive: true });
 }
@@ -190,6 +224,8 @@ export class TargumRepository {
         id TEXT PRIMARY KEY,
         verse_id TEXT NOT NULL,
         op_json TEXT NOT NULL,
+        source_type TEXT NOT NULL DEFAULT 'manual',
+        source_witness_id TEXT,
         author TEXT NOT NULL,
         note TEXT,
         created_at TEXT NOT NULL,
@@ -330,6 +366,7 @@ export class TargumRepository {
       CREATE TABLE IF NOT EXISTS region_ocr_artifacts (
         region_id TEXT PRIMARY KEY,
         crop_path TEXT NOT NULL,
+        crop_metadata_json TEXT NOT NULL DEFAULT '{}',
         text_raw TEXT NOT NULL DEFAULT '',
         ocr_mean_conf REAL NOT NULL DEFAULT 0,
         ocr_char_count INTEGER NOT NULL DEFAULT 0,
@@ -340,6 +377,45 @@ export class TargumRepository {
         FOREIGN KEY (region_id) REFERENCES page_regions(id)
       );
       CREATE INDEX IF NOT EXISTS idx_region_ocr_artifacts_region_id ON region_ocr_artifacts(region_id);
+
+      CREATE TABLE IF NOT EXISTS manuscript_run_state (
+        witness_id TEXT PRIMARY KEY,
+        ingest_status TEXT NOT NULL DEFAULT 'pending',
+        ocr_status TEXT NOT NULL DEFAULT 'pending',
+        split_status TEXT NOT NULL DEFAULT 'pending',
+        confidence_status TEXT NOT NULL DEFAULT 'pending',
+        blockers_json TEXT NOT NULL DEFAULT '[]',
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY (witness_id) REFERENCES witnesses(id)
+      );
+      CREATE TABLE IF NOT EXISTS manuscript_run_audit (
+        id TEXT PRIMARY KEY,
+        witness_id TEXT NOT NULL,
+        stage TEXT NOT NULL,
+        status TEXT NOT NULL,
+        override_used INTEGER NOT NULL DEFAULT 0,
+        actor TEXT NOT NULL,
+        note TEXT,
+        blockers_json TEXT NOT NULL DEFAULT '[]',
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (witness_id) REFERENCES witnesses(id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_manuscript_run_audit_witness ON manuscript_run_audit(witness_id, created_at DESC);
+
+      CREATE TABLE IF NOT EXISTS manuscript_automation_feedback (
+        id TEXT PRIMARY KEY,
+        page_id TEXT NOT NULL,
+        proposal_type TEXT NOT NULL,
+        proposal_id TEXT NOT NULL,
+        accepted INTEGER NOT NULL,
+        confidence REAL NOT NULL DEFAULT 0,
+        has_ground_truth INTEGER NOT NULL DEFAULT 0,
+        actor TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (page_id) REFERENCES pages(id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_automation_feedback_page ON manuscript_automation_feedback(page_id, created_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_automation_feedback_type ON manuscript_automation_feedback(proposal_type, created_at DESC);
     `);
 
     const verseStateColumns = this.db
@@ -348,6 +424,20 @@ export class TargumRepository {
 
     if (!verseStateColumns.some((column) => column.name === "flagged")) {
       this.db.exec("ALTER TABLE verse_state ADD COLUMN flagged INTEGER NOT NULL DEFAULT 0");
+    }
+
+    const patchColumns = this.db.prepare("PRAGMA table_info(patches)").all() as Array<{ name: string }>;
+    if (!patchColumns.some((column) => column.name === "source_type")) {
+      this.db.exec("ALTER TABLE patches ADD COLUMN source_type TEXT NOT NULL DEFAULT 'manual'");
+    }
+    if (!patchColumns.some((column) => column.name === "source_witness_id")) {
+      this.db.exec("ALTER TABLE patches ADD COLUMN source_witness_id TEXT");
+    }
+    this.db.exec("UPDATE patches SET source_type = 'manual' WHERE source_type IS NULL OR source_type = ''");
+
+    const ocrArtifactColumns = this.db.prepare("PRAGMA table_info(region_ocr_artifacts)").all() as Array<{ name: string }>;
+    if (!ocrArtifactColumns.some((column) => column.name === "crop_metadata_json")) {
+      this.db.exec("ALTER TABLE region_ocr_artifacts ADD COLUMN crop_metadata_json TEXT NOT NULL DEFAULT '{}'");
     }
   }
 
@@ -610,6 +700,33 @@ export class TargumRepository {
     };
   }
 
+  updatePageArtifacts(input: {
+    pageId: string;
+    thumbnailPath?: string | null;
+    quality?: Record<string, unknown>;
+    status?: ManuscriptStatus;
+  }): PageRecord {
+    const now = new Date().toISOString();
+    const current = this.getPage(input.pageId);
+    if (!current) throw new Error(`Page not found: ${input.pageId}`);
+
+    this.db
+      .prepare(
+        `UPDATE pages
+         SET thumbnail_path = ?, quality_json = ?, status = ?, updated_at = ?
+         WHERE id = ?`,
+      )
+      .run(
+        input.thumbnailPath === undefined ? current.thumbnailPath : input.thumbnailPath,
+        JSON.stringify(input.quality ?? current.quality),
+        input.status ?? current.status,
+        now,
+        input.pageId,
+      );
+
+    return this.getPage(input.pageId) as PageRecord;
+  }
+
   upsertPageRegion(input: {
     id?: string;
     pageId: string;
@@ -693,6 +810,7 @@ export class TargumRepository {
   upsertRegionOcrArtifact(input: {
     regionId: string;
     cropPath: string;
+    cropMetadata?: Record<string, unknown>;
     textRaw: string;
     ocrMeanConf: number;
     ocrCharCount: number;
@@ -703,11 +821,12 @@ export class TargumRepository {
     this.db
       .prepare(
         `INSERT INTO region_ocr_artifacts
-         (region_id, crop_path, text_raw, ocr_mean_conf, ocr_char_count, coverage_ratio_est, engine, created_at, updated_at)
+         (region_id, crop_path, crop_metadata_json, text_raw, ocr_mean_conf, ocr_char_count, coverage_ratio_est, engine, created_at, updated_at)
          VALUES
-         (@regionId, @cropPath, @textRaw, @ocrMeanConf, @ocrCharCount, @coverageRatioEst, @engine, @now, @now)
+         (@regionId, @cropPath, @cropMetadataJson, @textRaw, @ocrMeanConf, @ocrCharCount, @coverageRatioEst, @engine, @now, @now)
          ON CONFLICT(region_id) DO UPDATE SET
            crop_path = excluded.crop_path,
+           crop_metadata_json = excluded.crop_metadata_json,
            text_raw = excluded.text_raw,
            ocr_mean_conf = excluded.ocr_mean_conf,
            ocr_char_count = excluded.ocr_char_count,
@@ -717,6 +836,7 @@ export class TargumRepository {
       )
       .run({
         ...input,
+        cropMetadataJson: JSON.stringify(input.cropMetadata ?? {}),
         now,
       });
     return this.getRegionOcrArtifact(input.regionId) as RegionOcrArtifact;
@@ -725,13 +845,14 @@ export class TargumRepository {
   getRegionOcrArtifact(regionId: string): RegionOcrArtifact | null {
     const row = this.db
       .prepare(
-        `SELECT region_id, crop_path, text_raw, ocr_mean_conf, ocr_char_count, coverage_ratio_est, engine, created_at, updated_at
+        `SELECT region_id, crop_path, crop_metadata_json, text_raw, ocr_mean_conf, ocr_char_count, coverage_ratio_est, engine, created_at, updated_at
          FROM region_ocr_artifacts WHERE region_id = ?`,
       )
       .get(regionId) as
       | {
           region_id: string;
           crop_path: string;
+          crop_metadata_json: string;
           text_raw: string;
           ocr_mean_conf: number;
           ocr_char_count: number;
@@ -745,6 +866,7 @@ export class TargumRepository {
     return {
       regionId: row.region_id,
       cropPath: row.crop_path,
+      cropMetadata: JSON.parse(row.crop_metadata_json),
       textRaw: row.text_raw,
       ocrMeanConf: row.ocr_mean_conf,
       ocrCharCount: row.ocr_char_count,
@@ -1297,7 +1419,8 @@ export class TargumRepository {
         `SELECT COUNT(*) as count
          FROM page_regions r
          JOIN pages p ON p.id = r.page_id
-         WHERE p.witness_id = ? AND r.status NOT IN ('unavailable', 'failed')`,
+         LEFT JOIN region_ocr_artifacts a ON a.region_id = r.id
+         WHERE p.witness_id = ? AND r.status NOT IN ('unavailable', 'failed') AND a.region_id IS NULL`,
       )
       .get(witnessId) as { count: number };
 
@@ -1306,6 +1429,198 @@ export class TargumRepository {
       totalPages: totalPagesRow.count,
       regionsPendingOcr: regionsPendingOcrRow.count,
     };
+  }
+
+  getWitnessRunState(witnessId: string): WitnessRunStateRecord {
+    const row = this.db
+      .prepare(
+        `SELECT witness_id, ingest_status, ocr_status, split_status, confidence_status, blockers_json, updated_at
+         FROM manuscript_run_state WHERE witness_id = ?`,
+      )
+      .get(witnessId) as
+      | {
+          witness_id: string;
+          ingest_status: RunStageStatus;
+          ocr_status: RunStageStatus;
+          split_status: RunStageStatus;
+          confidence_status: RunStageStatus;
+          blockers_json: string;
+          updated_at: string;
+        }
+      | undefined;
+
+    if (!row) {
+      const now = new Date().toISOString();
+      this.db
+        .prepare(
+          `INSERT INTO manuscript_run_state
+           (witness_id, ingest_status, ocr_status, split_status, confidence_status, blockers_json, updated_at)
+           VALUES (?, 'pending', 'pending', 'pending', 'pending', '[]', ?)`,
+        )
+        .run(witnessId, now);
+      return {
+        witnessId,
+        ingestStatus: "pending",
+        ocrStatus: "pending",
+        splitStatus: "pending",
+        confidenceStatus: "pending",
+        blockers: [],
+        updatedAt: now,
+      };
+    }
+
+    return {
+      witnessId: row.witness_id,
+      ingestStatus: row.ingest_status,
+      ocrStatus: row.ocr_status,
+      splitStatus: row.split_status,
+      confidenceStatus: row.confidence_status,
+      blockers: JSON.parse(row.blockers_json),
+      updatedAt: row.updated_at,
+    };
+  }
+
+  setWitnessRunStage(input: {
+    witnessId: string;
+    stage: RunStage;
+    status: RunStageStatus;
+    blockers?: RunBlocker[];
+    actor?: string;
+    note?: string;
+    overrideUsed?: boolean;
+  }): WitnessRunStateRecord {
+    const now = new Date().toISOString();
+    const blockers = input.blockers ?? [];
+    const current = this.getWitnessRunState(input.witnessId);
+    const next = {
+      ingestStatus: current.ingestStatus,
+      ocrStatus: current.ocrStatus,
+      splitStatus: current.splitStatus,
+      confidenceStatus: current.confidenceStatus,
+    };
+    if (input.stage === "ingest") next.ingestStatus = input.status;
+    if (input.stage === "ocr") next.ocrStatus = input.status;
+    if (input.stage === "split") next.splitStatus = input.status;
+    if (input.stage === "confidence") next.confidenceStatus = input.status;
+
+    this.db
+      .prepare(
+        `INSERT INTO manuscript_run_state
+         (witness_id, ingest_status, ocr_status, split_status, confidence_status, blockers_json, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(witness_id) DO UPDATE SET
+           ingest_status = excluded.ingest_status,
+           ocr_status = excluded.ocr_status,
+           split_status = excluded.split_status,
+           confidence_status = excluded.confidence_status,
+           blockers_json = excluded.blockers_json,
+           updated_at = excluded.updated_at`,
+      )
+      .run(
+        input.witnessId,
+        next.ingestStatus,
+        next.ocrStatus,
+        next.splitStatus,
+        next.confidenceStatus,
+        JSON.stringify(blockers),
+        now,
+      );
+
+    this.db
+      .prepare(
+        `INSERT INTO manuscript_run_audit
+         (id, witness_id, stage, status, override_used, actor, note, blockers_json, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        crypto.randomUUID(),
+        input.witnessId,
+        input.stage,
+        input.status,
+        input.overrideUsed ? 1 : 0,
+        input.actor ?? this.options.author,
+        input.note ?? null,
+        JSON.stringify(blockers),
+        now,
+      );
+
+    return this.getWitnessRunState(input.witnessId);
+  }
+
+  addAutomationFeedback(input: {
+    pageId: string;
+    proposalType: "blocks" | "ranges";
+    proposalId: string;
+    accepted: boolean;
+    confidence: number;
+    hasGroundTruth?: boolean;
+    actor?: string;
+  }): AutomationFeedbackRecord {
+    const now = new Date().toISOString();
+    const id = crypto.randomUUID();
+    this.db
+      .prepare(
+        `INSERT INTO manuscript_automation_feedback
+         (id, page_id, proposal_type, proposal_id, accepted, confidence, has_ground_truth, actor, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        id,
+        input.pageId,
+        input.proposalType,
+        input.proposalId,
+        input.accepted ? 1 : 0,
+        input.confidence,
+        input.hasGroundTruth ? 1 : 0,
+        input.actor ?? this.options.author,
+        now,
+      );
+    return {
+      id,
+      pageId: input.pageId,
+      proposalType: input.proposalType,
+      proposalId: input.proposalId,
+      accepted: input.accepted,
+      confidence: input.confidence,
+      hasGroundTruth: Boolean(input.hasGroundTruth),
+      actor: input.actor ?? this.options.author,
+      createdAt: now,
+    };
+  }
+
+  getAutomationMetrics(proposalType?: "blocks" | "ranges"): {
+    total: number;
+    accepted: number;
+    rejected: number;
+    precision: number;
+    recall: number;
+  } {
+    const rows = (proposalType
+      ? this.db
+          .prepare(
+            `SELECT accepted, has_ground_truth
+             FROM manuscript_automation_feedback
+             WHERE proposal_type = ?`,
+          )
+          .all(proposalType)
+      : this.db
+          .prepare(
+            `SELECT accepted, has_ground_truth
+             FROM manuscript_automation_feedback`,
+          )
+          .all()) as Array<{ accepted: number; has_ground_truth: number }>;
+
+    const total = rows.length;
+    const accepted = rows.filter((row) => row.accepted === 1).length;
+    const rejected = total - accepted;
+    const withGroundTruth = rows.filter((row) => row.has_ground_truth === 1);
+    const truePositive = withGroundTruth.filter((row) => row.accepted === 1).length;
+    const falsePositive = withGroundTruth.filter((row) => row.accepted === 0).length;
+    const falseNegative = Math.max(0, withGroundTruth.length - truePositive);
+
+    const precision = truePositive + falsePositive > 0 ? truePositive / (truePositive + falsePositive) : 0;
+    const recall = truePositive + falseNegative > 0 ? truePositive / (truePositive + falseNegative) : 0;
+    return { total, accepted, rejected, precision, recall };
   }
 
   upsertVerse(verse: Verse): void {
@@ -1374,9 +1689,22 @@ export class TargumRepository {
     this.writeVerseMirror(verseId);
   }
 
-  addPatch(verseId: VerseId, op: PatchOp, note?: string, authorOverride?: string): PatchEntry {
+  addPatch(
+    verseId: VerseId,
+    op: PatchOp,
+    note?: string,
+    authorOverride?: string,
+    source?: { sourceType?: "manual" | "import" | "automation"; sourceWitnessId?: string | null },
+  ): PatchEntry {
     const run = this.db.transaction(
-      (targetVerseId: VerseId, patchOp: PatchOp, patchNote: string | undefined, patchAuthor: string): PatchEntry => {
+      (
+        targetVerseId: VerseId,
+        patchOp: PatchOp,
+        patchNote: string | undefined,
+        patchAuthor: string,
+        patchSourceType: "manual" | "import" | "automation",
+        patchSourceWitnessId: string | null,
+      ): PatchEntry => {
       const row = this.db
         .prepare("SELECT COALESCE(MAX(seq_no), 0) as maxSeq FROM patches WHERE verse_id = ?")
         .get(targetVerseId) as { maxSeq: number };
@@ -1385,6 +1713,8 @@ export class TargumRepository {
         id: crypto.randomUUID(),
         verseId: targetVerseId,
         op: patchOp,
+        sourceType: patchSourceType,
+        sourceWitnessId: patchSourceWitnessId,
         author: patchAuthor,
         note: patchNote,
         createdAt: now,
@@ -1393,10 +1723,20 @@ export class TargumRepository {
 
       this.db
         .prepare(
-          `INSERT INTO patches (id, verse_id, op_json, author, note, created_at, seq_no)
-           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO patches (id, verse_id, op_json, source_type, source_witness_id, author, note, created_at, seq_no)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
-        .run(entry.id, entry.verseId, JSON.stringify(entry.op), entry.author, entry.note ?? null, entry.createdAt, entry.seqNo);
+        .run(
+          entry.id,
+          entry.verseId,
+          JSON.stringify(entry.op),
+          entry.sourceType,
+          entry.sourceWitnessId ?? null,
+          entry.author,
+          entry.note ?? null,
+          entry.createdAt,
+          entry.seqNo,
+        );
 
       this.db
         .prepare("UPDATE verse_state SET patch_cursor = ?, updated_at = ? WHERE verse_id = ?")
@@ -1405,7 +1745,14 @@ export class TargumRepository {
       },
     );
 
-    const entry = run(verseId, op, note, authorOverride ?? this.options.author);
+    const entry = run(
+      verseId,
+      op,
+      note,
+      authorOverride ?? this.options.author,
+      source?.sourceType ?? "manual",
+      source?.sourceWitnessId ?? null,
+    );
 
     this.writePatchMirror(verseId);
     this.writeVerseMirror(verseId);
@@ -1442,10 +1789,14 @@ export class TargumRepository {
       .get(verseId) as { taam_json: string } | undefined;
 
     const patchRows = this.db
-      .prepare("SELECT id, op_json, author, note, created_at, seq_no FROM patches WHERE verse_id = ? ORDER BY seq_no ASC")
+      .prepare(
+        "SELECT id, op_json, source_type, source_witness_id, author, note, created_at, seq_no FROM patches WHERE verse_id = ? ORDER BY seq_no ASC",
+      )
       .all(verseId) as Array<{
       id: string;
       op_json: string;
+      source_type: "manual" | "import" | "automation";
+      source_witness_id: string | null;
       author: string;
       note: string | null;
       created_at: string;
@@ -1468,6 +1819,8 @@ export class TargumRepository {
       id: row.id,
       verseId,
       op: JSON.parse(row.op_json),
+      sourceType: row.source_type,
+      sourceWitnessId: row.source_witness_id,
       author: row.author,
       note: row.note ?? undefined,
       createdAt: row.created_at,
@@ -1513,12 +1866,14 @@ export class TargumRepository {
 
     const patchRows = this.db
       .prepare(
-        `SELECT verse_id, id, op_json, author, note, created_at, seq_no FROM patches WHERE verse_id IN (${placeholders}) ORDER BY verse_id, seq_no ASC`,
+        `SELECT verse_id, id, op_json, source_type, source_witness_id, author, note, created_at, seq_no FROM patches WHERE verse_id IN (${placeholders}) ORDER BY verse_id, seq_no ASC`,
       )
       .all(...verseIds) as Array<{
       verse_id: string;
       id: string;
       op_json: string;
+      source_type: "manual" | "import" | "automation";
+      source_witness_id: string | null;
       author: string;
       note: string | null;
       created_at: string;
@@ -1562,6 +1917,8 @@ export class TargumRepository {
         id: row.id,
         verseId,
         op: JSON.parse(row.op_json),
+        sourceType: row.source_type,
+        sourceWitnessId: row.source_witness_id,
         author: row.author,
         note: row.note ?? undefined,
         createdAt: row.created_at,

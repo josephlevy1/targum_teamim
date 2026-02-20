@@ -52,6 +52,8 @@ describe("core parser and transposer", () => {
       {
         id: "p1",
         verseId: "Genesis:1:1",
+        sourceType: "manual",
+        sourceWitnessId: null,
         author: "tester",
         createdAt: new Date().toISOString(),
         seqNo: 1,

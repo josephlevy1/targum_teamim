@@ -153,6 +153,8 @@ describe("TargumRepository manuscript foundations", () => {
       expect(tables).toContain("witness_verses");
       expect(tables).toContain("working_verse_text");
       expect(tables).toContain("base_text_patches");
+      expect(tables).toContain("manuscript_run_state");
+      expect(tables).toContain("manuscript_run_audit");
 
       const indexes = db
         .prepare("SELECT name FROM sqlite_master WHERE type = 'index'")
@@ -308,6 +310,117 @@ describe("TargumRepository manuscript foundations", () => {
       const failed = repo.getOcrJob(job.id);
       expect(failed?.status).toBe("failed");
       expect(failed?.error).toBe("boom");
+    } finally {
+      repo.close();
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("stores source attribution for taam patch history", () => {
+    const { repo, root } = createTempRepo();
+    try {
+      repo.upsertVerse(sampleVerse("Genesis:1:12"));
+      repo.saveGenerated("Genesis:1:12", [
+        {
+          taamId: "t1",
+          name: "TIPEHA",
+          unicodeMark: "\u0596",
+          tier: "CONJUNCTIVE",
+          position: { tokenIndex: 0, letterIndex: 0 },
+          confidence: 0.8,
+          reasons: ["seed"],
+        },
+      ]);
+
+      repo.addPatch(
+        "Genesis:1:12",
+        { type: "DELETE_TAAM", taamId: "t1" },
+        "test-note",
+        "reviewer-a",
+        { sourceType: "automation", sourceWitnessId: "vatican_ms_448" },
+      );
+      const record = repo.getVerseRecord("Genesis:1:12");
+      expect(record?.patches).toHaveLength(1);
+      expect(record?.patches[0].sourceType).toBe("automation");
+      expect(record?.patches[0].sourceWitnessId).toBe("vatican_ms_448");
+    } finally {
+      repo.close();
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("persists per-stage run state and blockers", () => {
+    const { repo, root } = createTempRepo();
+    try {
+      repo.upsertWitness({
+        id: "priority_p1",
+        name: "Priority P1",
+        type: "scanned_images",
+        authorityWeight: 1,
+        sourcePriority: 1,
+      });
+      repo.setWitnessRunStage({
+        witnessId: "priority_p1",
+        stage: "ocr",
+        status: "blocked",
+        blockers: [
+          {
+            stage: "ocr",
+            blockerWitnessId: "other",
+            blockerPriority: 0,
+            reasonCode: "TEST_BLOCK",
+            detail: "blocked",
+          },
+        ],
+        actor: "tester",
+      });
+
+      const state = repo.getWitnessRunState("priority_p1");
+      expect(state.ocrStatus).toBe("blocked");
+      expect(state.blockers[0]?.reasonCode).toBe("TEST_BLOCK");
+    } finally {
+      repo.close();
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("tracks automation feedback precision/recall metrics", () => {
+    const { repo, root } = createTempRepo();
+    try {
+      const witness = repo.upsertWitness({
+        id: "feedback_witness",
+        name: "Feedback Witness",
+        type: "scanned_images",
+        authorityWeight: 1,
+      });
+      const sourceDir = path.join(root, "feedback-source");
+      fs.mkdirSync(sourceDir, { recursive: true });
+      fs.writeFileSync(path.join(sourceDir, "001.png"), "png");
+      const imported = repo.importPagesFromDirectory({ witnessId: witness.id, directoryPath: sourceDir });
+
+      repo.addAutomationFeedback({
+        pageId: imported.pages[0].id,
+        proposalType: "ranges",
+        proposalId: "p1",
+        accepted: true,
+        confidence: 0.9,
+        hasGroundTruth: true,
+      });
+      repo.addAutomationFeedback({
+        pageId: imported.pages[0].id,
+        proposalType: "ranges",
+        proposalId: "p2",
+        accepted: false,
+        confidence: 0.4,
+        hasGroundTruth: true,
+      });
+
+      const metrics = repo.getAutomationMetrics("ranges");
+      expect(metrics.total).toBe(2);
+      expect(metrics.accepted).toBe(1);
+      expect(metrics.rejected).toBe(1);
+      expect(metrics.precision).toBeGreaterThanOrEqual(0);
+      expect(metrics.recall).toBeGreaterThanOrEqual(0);
     } finally {
       repo.close();
       fs.rmSync(root, { recursive: true, force: true });

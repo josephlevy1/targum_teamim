@@ -3,6 +3,8 @@ import path from "node:path";
 import { MANUSCRIPT_NORMALIZATION_FORM, compareVerseIdsCanonical, isVerseIdInRange } from "@targum/core";
 import { getDataPaths } from "./config";
 import { getRepository } from "./repository";
+import { createDeterministicCrop } from "./manuscripts-images";
+import { runOcrWithRetry } from "./manuscripts-ocr";
 
 function normalizeComparisonText(text: string): string {
   return text
@@ -42,13 +44,34 @@ export function createRegionCrop(regionId: string): { cropPath: string } {
   const { dataDir } = getDataPaths();
   const outDir = path.join(dataDir, "imports", "manuscripts", "crops");
   ensureDir(outDir);
-  const ext = path.extname(page.imagePath) || ".img";
-  const cropPath = path.join(outDir, `${regionId.replace(/[^a-zA-Z0-9_-]+/g, "_")}${ext}`);
-  fs.copyFileSync(page.imagePath, cropPath);
-  return { cropPath };
+  throw new Error("createRegionCrop is now async. Use createRegionCropAsync.");
 }
 
-export function runRegionOcr(regionId: string): {
+export async function createRegionCropAsync(regionId: string): Promise<{ cropPath: string; cropMetadata: Record<string, unknown> }> {
+  const repo = getRepository();
+  const region = repo.getPageRegion(regionId);
+  if (!region) throw new Error(`Region not found: ${regionId}`);
+  const page = repo.getPage(region.pageId);
+  if (!page) throw new Error(`Page not found: ${region.pageId}`);
+
+  const { dataDir } = getDataPaths();
+  const outDir = path.join(dataDir, "imports", "manuscripts", "crops");
+  ensureDir(outDir);
+  const crop = await createDeterministicCrop({
+    pagePath: page.imagePath,
+    bbox: region.bbox,
+    outDir,
+    regionId,
+    pageIndex: page.pageIndex,
+  });
+
+  return {
+    cropPath: crop.cropPath,
+    cropMetadata: crop.metadata,
+  };
+}
+
+export async function runRegionOcr(regionId: string): Promise<{
   jobId?: string;
   regionId: string;
   cropPath: string;
@@ -56,7 +79,7 @@ export function runRegionOcr(regionId: string): {
   ocrMeanConf: number;
   ocrCharCount: number;
   coverageRatioEst: number;
-} {
+}> {
   const repo = getRepository();
   const region = repo.getPageRegion(regionId);
   if (!region) throw new Error(`Region not found: ${regionId}`);
@@ -70,22 +93,18 @@ export function runRegionOcr(regionId: string): {
   repo.updateOcrJobStatus(job.id, "running");
 
   try {
-    const crop = createRegionCrop(regionId);
-    const verseIds = listVerseIdsInRange(region.startVerseId, region.endVerseId);
-    const baseline = verseIds.map((verseId) => renderAramaicFromVerseId(verseId)).join("\n");
-    const textRaw = baseline || `[OCR placeholder] ${path.basename(page.imagePath)} region ${regionId}`;
-    const ocrCharCount = textRaw.length;
-    const ocrMeanConf = baseline ? 0.9 : 0.35;
-    const coverageRatioEst = region.status === "ok" ? 1 : region.status === "partial" ? 0.6 : 0.1;
+    const crop = await createRegionCropAsync(regionId);
+    const ocr = await runOcrWithRetry(crop.cropPath);
 
     repo.upsertRegionOcrArtifact({
       regionId,
       cropPath: crop.cropPath,
-      textRaw,
-      ocrMeanConf,
-      ocrCharCount,
-      coverageRatioEst,
-      engine: "baseline-scaffold-ocr",
+      cropMetadata: crop.cropMetadata,
+      textRaw: ocr.textRaw,
+      ocrMeanConf: ocr.meanConfidence,
+      ocrCharCount: ocr.charCount,
+      coverageRatioEst: ocr.coverageEstimate,
+      engine: ocr.engine,
     });
     repo.updateOcrJobStatus(job.id, "completed");
 
@@ -93,10 +112,10 @@ export function runRegionOcr(regionId: string): {
       jobId: job.id,
       regionId,
       cropPath: crop.cropPath,
-      textRaw,
-      ocrMeanConf,
-      ocrCharCount,
-      coverageRatioEst,
+      textRaw: ocr.textRaw,
+      ocrMeanConf: ocr.meanConfidence,
+      ocrCharCount: ocr.charCount,
+      coverageRatioEst: ocr.coverageEstimate,
     };
   } catch (error) {
     repo.updateOcrJobStatus(job.id, "failed", error instanceof Error ? error.message : "OCR failure");
@@ -176,12 +195,12 @@ function splitRegionTextByBaseline(regionText: string, baselines: string[]): { s
   return { slices, partial, reason: partial ? "LOW_TEXT_COVERAGE" : undefined };
 }
 
-export function splitRegionIntoWitnessVerses(regionId: string): {
+export async function splitRegionIntoWitnessVerses(regionId: string): Promise<{
   witnessId: string;
   verseIds: string[];
   status: "ok" | "partial";
   reason?: string;
-} {
+}> {
   const repo = getRepository();
   const region = repo.getPageRegion(regionId);
   if (!region) throw new Error(`Region not found: ${regionId}`);
@@ -190,7 +209,7 @@ export function splitRegionIntoWitnessVerses(regionId: string): {
   }
   const page = repo.getPage(region.pageId);
   if (!page) throw new Error(`Page not found: ${region.pageId}`);
-  const ocr = repo.getRegionOcrArtifact(regionId) ?? runRegionOcr(regionId);
+  const ocr = repo.getRegionOcrArtifact(regionId) ?? (await runRegionOcr(regionId));
 
   const verseIds = listVerseIdsInRange(region.startVerseId, region.endVerseId);
   const baselineByVerse = verseIds.map((verseId) => renderAramaicFromVerseId(verseId));

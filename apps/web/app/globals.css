@@ -271,6 +271,84 @@ h4 {
   font-size: 0.82rem;
 }
 
+.annotator-wrap {
+  margin-top: 0.6rem;
+}
+
+.annotator-canvas {
+  position: relative;
+  width: 100%;
+  touch-action: none;
+  user-select: none;
+}
+
+.annotator-image {
+  width: 100%;
+  height: auto;
+  display: block;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.annotator-region {
+  position: absolute;
+  border: 2px solid #005f73;
+  background: rgba(0, 95, 115, 0.14);
+  color: #003e4c;
+  padding: 0;
+}
+
+.annotator-region.active {
+  border-color: #9b2226;
+  background: rgba(155, 34, 38, 0.15);
+}
+
+.annotator-region-label {
+  position: absolute;
+  top: -1.15rem;
+  left: 0;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 0.72rem;
+  padding: 0.05rem 0.25rem;
+}
+
+.annotator-region .handle {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border: 1px solid #fff;
+  background: #005f73;
+}
+
+.annotator-region .handle.tl {
+  top: -4px;
+  left: -4px;
+}
+
+.annotator-region .handle.tr {
+  top: -4px;
+  right: -4px;
+}
+
+.annotator-region .handle.bl {
+  bottom: -4px;
+  left: -4px;
+}
+
+.annotator-region .handle.br {
+  bottom: -4px;
+  right: -4px;
+}
+
+.annotator-draft {
+  position: absolute;
+  border: 2px dashed #9b2226;
+  background: rgba(155, 34, 38, 0.12);
+  pointer-events: none;
+}
+
 .field-label {
   display: block;
   margin-top: 8px;

@@ -177,3 +177,12 @@ Implement two incremental improvements:
 - What is the exact baseline digital Aramaic source currently imported?
 - Any known page→book/chapter mapping metadata for the image sets?
 If not provided, build tools/UI to capture mapping iteratively.
+
+## PR Quality Gate Policy (2026-02-20)
+- Branch protection on `main` should require at least 2 approving reviews.
+- Required checks on `main`: `PR Quality Gate / quality-checks`, `PR Quality Gate / validate-pr-body`.
+- PRs must use `.github/pull_request_template.md` sections:
+  - `Acceptance Criteria Checklist`
+  - `Migration / Data Notes`
+  - `Test Evidence`
+- CI enforces `pnpm typecheck` and `pnpm test` on every pull request.

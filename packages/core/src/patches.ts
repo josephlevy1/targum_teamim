@@ -64,11 +64,15 @@ export function newPatchEntry(
   author: string,
   seqNo: number,
   note?: string,
+  sourceType: "manual" | "import" | "automation" = "manual",
+  sourceWitnessId?: string | null,
 ): PatchEntry {
   return {
     id: crypto.randomUUID(),
     verseId: verseId as any,
     op,
+    sourceType,
+    sourceWitnessId: sourceWitnessId ?? null,
     author,
     note,
     createdAt: new Date().toISOString(),
