@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { applyPatchLog, parseVerse, transposeTaamim } from "./index.js";
+import {
+  MANUSCRIPT_NORMALIZATION_FORM,
+  MANUSCRIPT_WITNESS_IDS,
+  applyPatchLog,
+  isCanonicalVerseId,
+  parseCanonicalVerseId,
+  parseVerse,
+  transposeTaamim,
+} from "./index.js";
 
 const taamMap = {
   "\u0591": { name: "ETNACHTA", unicodeMark: "\u0591", tier: "DISJUNCTIVE" as const },
@@ -62,5 +70,14 @@ describe("core parser and transposer", () => {
     const generated = transposeTaamim(verse.hebrewTokens, verse.aramaicTokens, config);
     expect(generated.length).toBeGreaterThan(0);
     expect(generated.every((item) => item.position.tokenIndex === 0)).toBe(true);
+  });
+
+  it("defines manuscript constants and verse id parsing", () => {
+    expect(MANUSCRIPT_NORMALIZATION_FORM).toBe("NFC");
+    expect(MANUSCRIPT_WITNESS_IDS.vaticanMs448).toBe("vatican_ms_448");
+    expect(isCanonicalVerseId("Genesis:1:1")).toBe(true);
+    expect(isCanonicalVerseId("Genesis:0:1")).toBe(false);
+    expect(parseCanonicalVerseId("Genesis:2:3")).toBe("Genesis:2:3");
+    expect(() => parseCanonicalVerseId("bad-value")).toThrowError(/Invalid verse_id/);
   });
 });
