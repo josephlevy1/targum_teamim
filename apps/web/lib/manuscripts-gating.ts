@@ -1,4 +1,5 @@
 import type { RunBlocker, RunStage, WitnessRecord } from "@targum/storage";
+import type { TargumRepository } from "@targum/storage";
 import { getRepository } from "./repository";
 
 export interface GateEvaluation {
@@ -9,8 +10,7 @@ export interface GateEvaluation {
   overrideUsed: boolean;
 }
 
-function priorityWitnesses(): WitnessRecord[] {
-  const repo = getRepository();
+function priorityWitnesses(repo: TargumRepository): WitnessRecord[] {
   return repo
     .listWitnesses()
     .filter((w) => Number.isInteger(w.sourcePriority) && (w.sourcePriority ?? 0) > 0)
@@ -30,9 +30,9 @@ export function evaluateSourceGate(input: {
   adminOverride?: boolean;
   actor?: string;
   note?: string;
-}): GateEvaluation {
-  const repo = getRepository();
-  const witnesses = priorityWitnesses();
+}, repository?: TargumRepository): GateEvaluation {
+  const repo = repository ?? getRepository();
+  const witnesses = priorityWitnesses(repo);
   const witness = witnesses.find((w) => w.id === input.witnessId) ?? repo.getWitness(input.witnessId);
   if (!witness) throw new Error(`Witness not found: ${input.witnessId}`);
 
@@ -115,7 +115,7 @@ export function markStageFailed(witnessId: string, stage: RunStage, error: strin
 
 export function getSourceGateSnapshot() {
   const repo = getRepository();
-  return priorityWitnesses().map((witness) => ({
+  return priorityWitnesses(repo).map((witness) => ({
     witness,
     runState: repo.getWitnessRunState(witness.id),
   }));
