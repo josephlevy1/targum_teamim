@@ -1,0 +1,41 @@
+{
+  "witnessId": "vatican_ebr19_p2",
+  "mode": "calibration",
+  "startPage": 1,
+  "pageCount": 20,
+  "adminOverride": false,
+  "actor": "codex",
+  "engine": "tesseract",
+  "pagesImported": 20,
+  "regionsAnnotated": 20,
+  "regionsOcrCompleted": 20,
+  "regionsOcrFailed": 0,
+  "splitSuccess": 17,
+  "splitPartial": 3,
+  "meanOcrConfidence": 0.8967536411213576,
+  "blockers": [],
+  "stageTimings": {
+    "ingest": {
+      "startedAt": "2026-02-20T19:38:34.309Z",
+      "status": "completed",
+      "endedAt": "2026-02-20T19:38:35.521Z"
+    },
+    "ocr": {
+      "startedAt": "2026-02-20T19:38:35.522Z",
+      "status": "completed",
+      "endedAt": "2026-02-20T19:38:51.355Z"
+    },
+    "split": {
+      "startedAt": "2026-02-20T19:38:51.356Z",
+      "status": "completed",
+      "endedAt": "2026-02-20T19:38:51.657Z"
+    },
+    "confidence": {
+      "startedAt": "2026-02-20T19:38:51.657Z",
+      "status": "completed",
+      "endedAt": "2026-02-20T19:38:51.659Z"
+    }
+  },
+  "runStartedAt": "2026-02-20T19:38:34.307Z",
+  "runFinishedAt": "2026-02-20T19:38:51.659Z"
+}

@@ -170,6 +170,17 @@ export interface AutomationFeedbackRecord {
   actor: string;
 }
 
+export interface ManuscriptFetchRunRecord {
+  id: string;
+  witnessId: string;
+  sourceLink: string;
+  manifestUrl: string | null;
+  status: "completed" | "failed";
+  pageCount: number;
+  error: string | null;
+  createdAt: string;
+}
+
 function ensureDir(dir: string): void {
   fs.mkdirSync(dir, { recursive: true });
 }
@@ -416,6 +427,19 @@ export class TargumRepository {
       );
       CREATE INDEX IF NOT EXISTS idx_automation_feedback_page ON manuscript_automation_feedback(page_id, created_at DESC);
       CREATE INDEX IF NOT EXISTS idx_automation_feedback_type ON manuscript_automation_feedback(proposal_type, created_at DESC);
+
+      CREATE TABLE IF NOT EXISTS manuscript_fetch_runs (
+        id TEXT PRIMARY KEY,
+        witness_id TEXT NOT NULL,
+        source_link TEXT NOT NULL,
+        manifest_url TEXT,
+        status TEXT NOT NULL,
+        page_count INTEGER NOT NULL DEFAULT 0,
+        error TEXT,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (witness_id) REFERENCES witnesses(id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_manuscript_fetch_runs_witness ON manuscript_fetch_runs(witness_id, created_at DESC);
     `);
 
     const verseStateColumns = this.db
@@ -589,7 +613,7 @@ export class TargumRepository {
     }));
   }
 
-  importPagesFromDirectory(input: { witnessId: string; directoryPath: string }): { imported: number; pages: PageRecord[] } {
+  importPagesFromDirectory(input: { witnessId: string; directoryPath: string; startIndex?: number }): { imported: number; pages: PageRecord[] } {
     const witness = this.getWitness(input.witnessId);
     if (!witness) {
       throw new Error(`Witness not found: ${input.witnessId}`);
@@ -621,11 +645,13 @@ export class TargumRepository {
 
     const pages: PageRecord[] = [];
     const run = this.db.transaction(() => {
+      const startIndex = input.startIndex ?? 1;
       files.forEach((filePath, index) => {
         const quality = { fileSizeBytes: fs.statSync(filePath).size, extension: path.extname(filePath).toLowerCase() };
         const status: ManuscriptStatus = quality.extension === ".pdf" ? "partial" : "ok";
-        const id = `${input.witnessId}:page:${index + 1}`;
-        insert.run(id, input.witnessId, filePath, index + 1, null, JSON.stringify(quality), status, now, now);
+        const pageIndex = startIndex + index;
+        const id = `${input.witnessId}:page:${pageIndex}`;
+        insert.run(id, input.witnessId, filePath, pageIndex, null, JSON.stringify(quality), status, now, now);
       });
     });
     run();
@@ -1621,6 +1647,75 @@ export class TargumRepository {
     const precision = truePositive + falsePositive > 0 ? truePositive / (truePositive + falsePositive) : 0;
     const recall = truePositive + falseNegative > 0 ? truePositive / (truePositive + falseNegative) : 0;
     return { total, accepted, rejected, precision, recall };
+  }
+
+  addManuscriptFetchRun(input: {
+    witnessId: string;
+    sourceLink: string;
+    manifestUrl?: string | null;
+    status: "completed" | "failed";
+    pageCount: number;
+    error?: string | null;
+  }): ManuscriptFetchRunRecord {
+    const now = new Date().toISOString();
+    const id = crypto.randomUUID();
+    this.db
+      .prepare(
+        `INSERT INTO manuscript_fetch_runs
+         (id, witness_id, source_link, manifest_url, status, page_count, error, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(id, input.witnessId, input.sourceLink, input.manifestUrl ?? null, input.status, input.pageCount, input.error ?? null, now);
+
+    return {
+      id,
+      witnessId: input.witnessId,
+      sourceLink: input.sourceLink,
+      manifestUrl: input.manifestUrl ?? null,
+      status: input.status,
+      pageCount: input.pageCount,
+      error: input.error ?? null,
+      createdAt: now,
+    };
+  }
+
+  listManuscriptFetchRuns(witnessId?: string): ManuscriptFetchRunRecord[] {
+    const rows = (witnessId
+      ? this.db
+          .prepare(
+            `SELECT id, witness_id, source_link, manifest_url, status, page_count, error, created_at
+             FROM manuscript_fetch_runs
+             WHERE witness_id = ?
+             ORDER BY created_at DESC`,
+          )
+          .all(witnessId)
+      : this.db
+          .prepare(
+            `SELECT id, witness_id, source_link, manifest_url, status, page_count, error, created_at
+             FROM manuscript_fetch_runs
+             ORDER BY created_at DESC`,
+          )
+          .all()) as Array<{
+      id: string;
+      witness_id: string;
+      source_link: string;
+      manifest_url: string | null;
+      status: "completed" | "failed";
+      page_count: number;
+      error: string | null;
+      created_at: string;
+    }>;
+
+    return rows.map((row) => ({
+      id: row.id,
+      witnessId: row.witness_id,
+      sourceLink: row.source_link,
+      manifestUrl: row.manifest_url,
+      status: row.status,
+      pageCount: row.page_count,
+      error: row.error,
+      createdAt: row.created_at,
+    }));
   }
 
   upsertVerse(verse: Verse): void {

@@ -15,7 +15,11 @@
     "transpose": "tsx scripts/transpose-range.ts",
     "scrape:torah": "tsx scripts/scrape-torah.ts",
     "run:torah": "tsx scripts/run-torah.ts",
-    "manuscripts:calibration": "tsx scripts/run-manuscript-calibration.ts"
+    "manuscripts:calibration": "tsx scripts/run-manuscript-calibration.ts",
+    "manuscripts:bootstrap": "tsx scripts/bootstrap-manuscript-witnesses.ts",
+    "manuscripts:fetch-vaticana": "tsx scripts/fetch-vaticana-pages.ts",
+    "manuscripts:import-run": "tsx scripts/run-manuscript-import.ts",
+    "manuscripts:status": "tsx scripts/manuscripts-status.ts"
   },
   "dependencies": {
     "@clerk/nextjs": "^6.10.0",

@@ -155,6 +155,7 @@ describe("TargumRepository manuscript foundations", () => {
       expect(tables).toContain("base_text_patches");
       expect(tables).toContain("manuscript_run_state");
       expect(tables).toContain("manuscript_run_audit");
+      expect(tables).toContain("manuscript_fetch_runs");
 
       const indexes = db
         .prepare("SELECT name FROM sqlite_master WHERE type = 'index'")
@@ -193,6 +194,14 @@ describe("TargumRepository manuscript foundations", () => {
       expect(imported.pages).toHaveLength(2);
       expect(imported.pages[0].status).toBe("ok");
       expect(imported.pages[1].status).toBe("partial");
+
+      const importedOffset = repo.importPagesFromDirectory({
+        witnessId: witness.id,
+        directoryPath: sourceDir,
+        startIndex: 5,
+      });
+      expect(importedOffset.pages.some((page) => page.pageIndex === 5)).toBe(true);
+      expect(importedOffset.pages.some((page) => page.pageIndex === 6)).toBe(true);
     } finally {
       repo.close();
       fs.rmSync(root, { recursive: true, force: true });
@@ -421,6 +430,42 @@ describe("TargumRepository manuscript foundations", () => {
       expect(metrics.rejected).toBe(1);
       expect(metrics.precision).toBeGreaterThanOrEqual(0);
       expect(metrics.recall).toBeGreaterThanOrEqual(0);
+    } finally {
+      repo.close();
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("stores manuscript fetch run audit entries", () => {
+    const { repo, root } = createTempRepo();
+    try {
+      repo.upsertWitness({
+        id: "vatican_vetus_p1",
+        name: "Biblia Vetus",
+        type: "scanned_images",
+        authorityWeight: 1,
+        sourcePriority: 1,
+      });
+
+      repo.addManuscriptFetchRun({
+        witnessId: "vatican_vetus_p1",
+        sourceLink: "https://digi.vatlib.it/view/MSS_Vat.ebr.448",
+        manifestUrl: "https://digi.vatlib.it/iiif/MSS_Vat.ebr.448/manifest.json",
+        status: "completed",
+        pageCount: 20,
+      });
+      repo.addManuscriptFetchRun({
+        witnessId: "vatican_vetus_p1",
+        sourceLink: "https://digi.vatlib.it/view/MSS_Vat.ebr.448",
+        status: "failed",
+        pageCount: 0,
+        error: "HTTP 404",
+      });
+
+      const runs = repo.listManuscriptFetchRuns("vatican_vetus_p1");
+      expect(runs).toHaveLength(2);
+      const statuses = runs.map((run) => run.status).sort();
+      expect(statuses).toEqual(["completed", "failed"]);
     } finally {
       repo.close();
       fs.rmSync(root, { recursive: true, force: true });

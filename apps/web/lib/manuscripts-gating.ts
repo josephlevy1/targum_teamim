@@ -14,6 +14,7 @@ function priorityWitnesses(repo: TargumRepository): WitnessRecord[] {
   return repo
     .listWitnesses()
     .filter((w) => Number.isInteger(w.sourcePriority) && (w.sourcePriority ?? 0) > 0)
+    .filter((w) => Boolean(w.sourceLink) || Boolean(w.sourceFileName))
     .sort((a, b) => (a.sourcePriority ?? 99) - (b.sourcePriority ?? 99));
 }
 
