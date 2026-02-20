@@ -1,0 +1,27 @@
+TAAM.IM MANUSCRIPT IMPORT PIPELINE — HIGH-LEVEL PROJECT PLAN (MVP → AUTOMATION)
+
+1) Define target: improve/validate Aramaic base text per verse using scanned witnesses; ta’amim remain transposed-from-Hebrew for now.
+2) Create “Witness Registry” (Vatican, HebrewBooks, Baseline Digital) with authority weights + metadata fields.
+3) Prep (Joseph): gather page image sets locally (folder per witness/book), note known gaps/ripped pages, confirm book/chapter coverage.
+4) Prep (Joseph): provide baseline digital Aramaic already in app as canonical scaffold for alignment/splitting.
+5) Dev: implement page ingestion (directory import), generate thumbnails, persist page metadata + basic quality stats.
+6) Dev: implement Page Annotator (manual) to draw block rectangles and tag each block with a verse range (e.g., Gen 1:1–1:5).
+7) HUMAN↔AI HANDOFF: Joseph tags first 10–20 pages to establish ground-truth patterns; dev/AI iterates on UI speed.
+8) Dev: OCR Job Runner for each cropped block; store raw OCR text + confidence metrics + “coverage” stats.
+9) Dev: Normalize layer (Unicode normalization, punctuation/spacing standardization for comparisons; never overwrite raw witness).
+10) Dev: Verse Extractor that splits block OCR into per-verse strings using alignment against baseline digital text.
+11) Dev: Alignment + Diff view per verse (witness vs baseline), with token/char-level ops (ins/del/sub).
+12) Dev: Confidence Engine per witness-verse (authority prior + clarity/OCR + match-to-baseline + completeness).
+13) Dev: Cascade Selector per verse (Vatican → HebrewBooks → Baseline), with ensemble confidence + disagreement flags.
+14) Dev: Integrate into existing queues: “Low text confidence”, “Scan disagreement”, “Unavailable/partial scan”, separate from ta’am queue.
+15) HUMAN↔AI HANDOFF: Joseph reviews only verses under thresholds; marks “Verified” / “Keep baseline” / “Accept witness reading”.
+16) Dev: Persist decisions as patches to base text (parallel to MOVE_TAAM style), with audit trail.
+17) Dev: Export: working Aramaic text + confidence report + (optional) witness diffs JSON; ensure deterministic Unicode output.
+18) Dev: MVP automation step: auto-detect text blocks on page and propose rectangles; user only корректs (no verse tagging yet).
+19) Dev: Next automation step: OCR full page + align to baseline to propose verse ranges; user approves/edits boundaries.
+20) Scale-up: batch import remaining pages; monitor failure modes; iterate thresholds and UI ergonomics.
+
+Needs from Joseph (prep + ongoing):
+- Local page image folders per witness, plus any index notes
+- Baseline digital Aramaic text confirmation (source + coverage)
+- Initial manual tagging of sample pages; ongoing review of low-confidence verses

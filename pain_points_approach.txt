@@ -1,0 +1,61 @@
+EXPECTED PAIN POINTS + WORKAROUNDS (BUILT INTO PLAN/PROMPT)
+
+A) OCR QUALITY / MANUSCRIPT VARIABILITY
+- Pain: OCR fails on faint ink, unusual glyph forms, small ta’amim marks, damaged pages.
+  Workarounds:
+  - Treat OCR as producing “witness candidates” with clarity/coverage scoring, not truth.
+  - Store raw crops + OCR output; allow re-run with different OCR engines/settings.
+  - Start with block-level OCR + baseline-guided alignment for splitting (more robust).
+  - Mark pages/regions as damaged/unavailable and cascade fallback automatically.
+
+B) VERSE BOUNDARY SPLITTING
+- Pain: OCR text for a block containing multiple verses may not split cleanly.
+  Workarounds:
+  - Use baseline digital Aramaic as scaffold: align concatenated baseline to OCR stream.
+  - Provide lightweight manual boundary adjustment UI when auto split fails.
+  - Track “partial” status rather than blocking progress.
+
+C) FALSE “CORRECTIONS” VS REAL VARIANTS
+- Pain: Manuscripts may differ legitimately; naive “match-to-baseline” scoring could mislabel variants as errors.
+  Workarounds:
+  - Add disagreement flag: “high-confidence sources differ materially” => review/variant-candidate.
+  - Start with canonical working text (Option A) but store diffs so variants apparatus can be added later.
+  - Never overwrite working text silently; require “accept witness reading” action that writes a patch.
+
+D) CASCADE LOGIC (AUTHORITY VS CLARITY)
+- Pain: Vatican is highest authority but may be less legible than HebrewBooks on specific verses.
+  Workarounds:
+  - Use authority as a prior, not an absolute rule: per-verse source_confidence includes clarity/completeness.
+  - Per-witness minimum thresholds (T_vatican_min, T_hb_min) to prevent low-quality Vatican from winning.
+  - Ensemble corroboration boost when multiple witnesses agree.
+
+E) USER THROUGHPUT / UI FRICTION
+- Pain: Manual cropping and review could be time-consuming without ergonomic tooling.
+  Workarounds:
+  - MVP: block rectangles tagged with verse ranges (not per-verse cropping initially).
+  - Batch workflows: review queues (low confidence / disagreement / unavailable) to focus attention.
+  - Keyboard shortcuts and rapid diff toggles.
+  - Add auto block detection early as Phase 3A to reduce manual effort.
+
+F) DATA MANAGEMENT / LOCAL-FIRST RELIABILITY
+- Pain: Large image sets + OCR outputs + diffs can get heavy; risk of brittle storage.
+  Workarounds:
+  - Use local job runner with persistent DB (SQLite/Postgres) and file-path references to images.
+  - Store derived artifacts (crops, OCR outputs) with deterministic IDs for reproducibility.
+  - Add “rebuild derived artifacts” commands (re-OCR, re-align) without losing patches.
+
+G) DETERMINISTIC EXPORT / UNICODE NORMALIZATION
+- Pain: Unicode combining marks can reorder or normalize inconsistently across environments.
+  Workarounds:
+  - Enforce one Unicode normalization form consistently and define deterministic combining-mark ordering in renderer.
+  - Keep “raw witness” separate from “normalized comparison” and “rendered export.”
+  - Add export validation checks (round-trip stability tests).
+
+H) SCOPE CREEP: TA’AMIM EXTRACTION FROM SCANS
+- Pain: Extracting ta’amim from manuscript images is substantially harder and may derail MVP.
+  Workarounds:
+  - Defer ta’amim-from-scan extraction to a later phase unless OCR proves reliable.
+  - Use scans primarily to improve/validate base Aramaic text first; keep current Hebrew-transpose ta’amim workflow.
+  - If needed later, treat ta’amim as a separate witness layer with its own confidence and alignment.
+
+(These workarounds are explicitly incorporated in Item 1’s phased plan and Item 2’s Codex build prompt.)
