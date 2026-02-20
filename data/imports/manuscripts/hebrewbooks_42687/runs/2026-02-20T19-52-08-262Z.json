@@ -1,0 +1,41 @@
+{
+  "witnessId": "hebrewbooks_42687",
+  "mode": "calibration",
+  "startPage": 1,
+  "pageCount": 20,
+  "adminOverride": false,
+  "actor": "codex",
+  "engine": "tesseract",
+  "pagesImported": 20,
+  "regionsAnnotated": 20,
+  "regionsOcrCompleted": 20,
+  "regionsOcrFailed": 0,
+  "splitSuccess": 20,
+  "splitPartial": 0,
+  "meanOcrConfidence": 0.2332978899000447,
+  "blockers": [],
+  "stageTimings": {
+    "ingest": {
+      "startedAt": "2026-02-20T19:49:50.025Z",
+      "status": "completed",
+      "endedAt": "2026-02-20T19:49:51.356Z"
+    },
+    "ocr": {
+      "startedAt": "2026-02-20T19:49:51.357Z",
+      "status": "completed",
+      "endedAt": "2026-02-20T19:52:07.951Z"
+    },
+    "split": {
+      "startedAt": "2026-02-20T19:52:07.951Z",
+      "status": "completed",
+      "endedAt": "2026-02-20T19:52:08.259Z"
+    },
+    "confidence": {
+      "startedAt": "2026-02-20T19:52:08.259Z",
+      "status": "completed",
+      "endedAt": "2026-02-20T19:52:08.261Z"
+    }
+  },
+  "runStartedAt": "2026-02-20T19:49:24.784Z",
+  "runFinishedAt": "2026-02-20T19:52:08.261Z"
+}
