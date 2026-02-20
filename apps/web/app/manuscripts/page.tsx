@@ -46,6 +46,7 @@ export default function ManuscriptsPage() {
   const [bboxW, setBboxW] = useState("100");
   const [bboxH, setBboxH] = useState("100");
   const [pipelineVerseId, setPipelineVerseId] = useState("");
+  const [zoomPercent, setZoomPercent] = useState(100);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -53,6 +54,7 @@ export default function ManuscriptsPage() {
     () => witnesses.find((w) => w.id === selectedWitnessId) ?? null,
     [selectedWitnessId, witnesses],
   );
+  const selectedPage = useMemo(() => pages.find((page) => page.id === selectedPageId) ?? null, [pages, selectedPageId]);
 
   async function loadWitnesses() {
     const response = await fetch("/api/manuscripts/witnesses");
@@ -354,6 +356,49 @@ export default function ManuscriptsPage() {
           </div>
         ) : (
           <p className="small">No witness selected.</p>
+        )}
+      </section>
+
+      <section className="panel">
+        <h3>Page Viewer</h3>
+        {selectedPage ? (
+          <>
+            <p className="small">
+              Page {selectedPage.pageIndex} ({selectedPage.status}) | Path: {selectedPage.imagePath}
+            </p>
+            <div className="reading-controls-row">
+              <label htmlFor="zoom-range">Zoom</label>
+              <input
+                id="zoom-range"
+                type="range"
+                min={50}
+                max={250}
+                step={10}
+                value={zoomPercent}
+                onChange={(event) => setZoomPercent(Number(event.target.value))}
+              />
+              <span className="small">{zoomPercent}%</span>
+            </div>
+            <div style={{ border: "1px solid #d1d5db", borderRadius: 8, overflow: "auto", maxHeight: "70vh", padding: "0.5rem" }}>
+              {selectedPage.imagePath.match(/\.(png|jpg|jpeg|webp|tif|tiff)$/i) ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={selectedPage.imagePath}
+                  alt={`Selected page ${selectedPage.pageIndex}`}
+                  style={{
+                    width: `${zoomPercent}%`,
+                    maxWidth: "none",
+                    display: "block",
+                    transformOrigin: "top left",
+                  }}
+                />
+              ) : (
+                <p className="small">Selected file is not browser-renderable image format.</p>
+              )}
+            </div>
+          </>
+        ) : (
+          <p className="small">Select a page to view at full resolution with zoom/pan.</p>
         )}
       </section>
 
