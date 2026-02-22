@@ -238,10 +238,6 @@ export async function downloadVaticanaPages(input: VaticanaFetchOptions): Promis
     throw new Error(`Requested start page ${startPage} exceeds manifest page count ${imageUrls.length}.`);
   }
 
-  for (const file of fs.readdirSync(rawPagesDir)) {
-    fs.rmSync(path.join(rawPagesDir, file), { force: true, recursive: true });
-  }
-
   const fetched: VaticanaFetchResult["fetchedPages"] = [];
   const stopPage = Math.min(endPage, imageUrls.length);
 

@@ -158,6 +158,35 @@ export interface WitnessRunStateRecord {
   updatedAt: string;
 }
 
+export interface ManuscriptOpsWitnessSnapshot {
+  witnessId: string;
+  witnessName: string;
+  sourcePriority: number | null;
+  sourceFileName: string | null;
+  sourceLink: string | null;
+  ingestStatus: RunStageStatus;
+  ocrStatus: RunStageStatus;
+  splitStatus: RunStageStatus;
+  confidenceStatus: RunStageStatus;
+  runStateUpdatedAt: string;
+  pagesImported: number;
+  maxPageIndex: number;
+  regionsTotal: number;
+  regionsEligibleForOcr: number;
+  regionsTagged: number;
+  ocrArtifacts: number;
+  ocrJobsQueued: number;
+  ocrJobsRunning: number;
+  ocrJobsFailed: number;
+  splitRows: number;
+  splitPartialRows: number;
+  alignmentMeanScore: number;
+  confidenceMeanScore: number;
+  latestFetchStatus: "completed" | "failed" | null;
+  latestFetchPageCount: number;
+  latestFetchAt: string | null;
+}
+
 export interface AutomationFeedbackRecord {
   id: string;
   pageId: string;
@@ -1455,6 +1484,131 @@ export class TargumRepository {
       totalPages: totalPagesRow.count,
       regionsPendingOcr: regionsPendingOcrRow.count,
     };
+  }
+
+  getManuscriptOpsSnapshot(): ManuscriptOpsWitnessSnapshot[] {
+    const rows = this.db
+      .prepare(
+        `SELECT
+           w.id AS witness_id,
+           w.name AS witness_name,
+           w.source_priority AS source_priority,
+           w.source_file_name AS source_file_name,
+           w.source_link AS source_link,
+           COALESCE(rs.ingest_status, 'pending') AS ingest_status,
+           COALESCE(rs.ocr_status, 'pending') AS ocr_status,
+           COALESCE(rs.split_status, 'pending') AS split_status,
+           COALESCE(rs.confidence_status, 'pending') AS confidence_status,
+           COALESCE(rs.updated_at, w.updated_at) AS run_state_updated_at,
+           (SELECT COUNT(*) FROM pages p WHERE p.witness_id = w.id) AS pages_imported,
+           (SELECT COALESCE(MAX(p.page_index), 0) FROM pages p WHERE p.witness_id = w.id) AS max_page_index,
+           (SELECT COUNT(*)
+              FROM page_regions r
+              JOIN pages p ON p.id = r.page_id
+             WHERE p.witness_id = w.id) AS regions_total,
+           (SELECT COUNT(*)
+              FROM page_regions r
+              JOIN pages p ON p.id = r.page_id
+             WHERE p.witness_id = w.id
+               AND r.status NOT IN ('failed', 'unavailable')) AS regions_eligible_for_ocr,
+           (SELECT COUNT(*)
+              FROM page_regions r
+              JOIN pages p ON p.id = r.page_id
+             WHERE p.witness_id = w.id
+               AND r.status NOT IN ('failed', 'unavailable')
+               AND r.start_verse_id IS NOT NULL
+               AND r.end_verse_id IS NOT NULL) AS regions_tagged,
+           (SELECT COUNT(*)
+              FROM region_ocr_artifacts a
+              JOIN page_regions r ON r.id = a.region_id
+              JOIN pages p ON p.id = r.page_id
+             WHERE p.witness_id = w.id) AS ocr_artifacts,
+           (SELECT COUNT(*)
+              FROM ocr_jobs j
+              JOIN page_regions r ON r.id = j.region_id
+              JOIN pages p ON p.id = r.page_id
+             WHERE p.witness_id = w.id AND j.status = 'queued') AS ocr_jobs_queued,
+           (SELECT COUNT(*)
+              FROM ocr_jobs j
+              JOIN page_regions r ON r.id = j.region_id
+              JOIN pages p ON p.id = r.page_id
+             WHERE p.witness_id = w.id AND j.status = 'running') AS ocr_jobs_running,
+           (SELECT COUNT(*)
+              FROM ocr_jobs j
+              JOIN page_regions r ON r.id = j.region_id
+              JOIN pages p ON p.id = r.page_id
+             WHERE p.witness_id = w.id AND j.status = 'failed') AS ocr_jobs_failed,
+           (SELECT COUNT(*) FROM witness_verses v WHERE v.witness_id = w.id) AS split_rows,
+           (SELECT COUNT(*) FROM witness_verses v WHERE v.witness_id = w.id AND v.status = 'partial') AS split_partial_rows,
+           (SELECT COALESCE(AVG(v.match_score), 0) FROM witness_verses v WHERE v.witness_id = w.id) AS alignment_mean_score,
+           (SELECT COALESCE(AVG(v.source_confidence), 0) FROM witness_verses v WHERE v.witness_id = w.id) AS confidence_mean_score,
+           (SELECT m.status FROM manuscript_fetch_runs m WHERE m.witness_id = w.id ORDER BY m.created_at DESC LIMIT 1) AS latest_fetch_status,
+           (SELECT COALESCE(m.page_count, 0) FROM manuscript_fetch_runs m WHERE m.witness_id = w.id ORDER BY m.created_at DESC LIMIT 1) AS latest_fetch_page_count,
+           (SELECT m.created_at FROM manuscript_fetch_runs m WHERE m.witness_id = w.id ORDER BY m.created_at DESC LIMIT 1) AS latest_fetch_at
+         FROM witnesses w
+         LEFT JOIN manuscript_run_state rs ON rs.witness_id = w.id
+         WHERE w.source_priority IS NOT NULL
+           AND w.source_priority BETWEEN 1 AND 12
+           AND (w.source_link IS NOT NULL OR w.source_file_name IS NOT NULL)
+         ORDER BY w.source_priority ASC, w.name ASC`,
+      )
+      .all() as Array<{
+      witness_id: string;
+      witness_name: string;
+      source_priority: number | null;
+      source_file_name: string | null;
+      source_link: string | null;
+      ingest_status: RunStageStatus;
+      ocr_status: RunStageStatus;
+      split_status: RunStageStatus;
+      confidence_status: RunStageStatus;
+      run_state_updated_at: string;
+      pages_imported: number;
+      max_page_index: number;
+      regions_total: number;
+      regions_eligible_for_ocr: number;
+      regions_tagged: number;
+      ocr_artifacts: number;
+      ocr_jobs_queued: number;
+      ocr_jobs_running: number;
+      ocr_jobs_failed: number;
+      split_rows: number;
+      split_partial_rows: number;
+      alignment_mean_score: number;
+      confidence_mean_score: number;
+      latest_fetch_status: "completed" | "failed" | null;
+      latest_fetch_page_count: number;
+      latest_fetch_at: string | null;
+    }>;
+
+    return rows.map((row) => ({
+      witnessId: row.witness_id,
+      witnessName: row.witness_name,
+      sourcePriority: row.source_priority,
+      sourceFileName: row.source_file_name,
+      sourceLink: row.source_link,
+      ingestStatus: row.ingest_status,
+      ocrStatus: row.ocr_status,
+      splitStatus: row.split_status,
+      confidenceStatus: row.confidence_status,
+      runStateUpdatedAt: row.run_state_updated_at,
+      pagesImported: row.pages_imported,
+      maxPageIndex: row.max_page_index,
+      regionsTotal: row.regions_total,
+      regionsEligibleForOcr: row.regions_eligible_for_ocr,
+      regionsTagged: row.regions_tagged,
+      ocrArtifacts: row.ocr_artifacts,
+      ocrJobsQueued: row.ocr_jobs_queued,
+      ocrJobsRunning: row.ocr_jobs_running,
+      ocrJobsFailed: row.ocr_jobs_failed,
+      splitRows: row.split_rows,
+      splitPartialRows: row.split_partial_rows,
+      alignmentMeanScore: row.alignment_mean_score,
+      confidenceMeanScore: row.confidence_mean_score,
+      latestFetchStatus: row.latest_fetch_status,
+      latestFetchPageCount: row.latest_fetch_page_count,
+      latestFetchAt: row.latest_fetch_at,
+    }));
   }
 
   getWitnessRunState(witnessId: string): WitnessRunStateRecord {
