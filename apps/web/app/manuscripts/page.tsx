@@ -429,6 +429,9 @@ export default function ManuscriptsPage() {
       <section className="panel">
         <h2>Manuscript Import</h2>
         <p className="small">Priority follows book_sources/book_list.csv (P1 → P12). Use arrow keys for page nav, Ctrl/Cmd+S to save region.</p>
+        <p className="small">
+          Live operations view: <a href="/manuscripts/dashboard">/manuscripts/dashboard</a>
+        </p>
         {message ? <p className="small">{message}</p> : null}
 
         <div className="reading-controls-row">

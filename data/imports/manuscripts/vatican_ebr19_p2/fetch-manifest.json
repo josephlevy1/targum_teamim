@@ -2,150 +2,24 @@
   "witnessId": "vatican_ebr19_p2",
   "sourceLink": "https://digi.vatlib.it/view/MSS_Vat.ebr.19",
   "manifestUrl": "https://digi.vatlib.it/iiif/MSS_Vat.ebr.19/manifest.json",
-  "savedAt": "2026-02-20T19:35:38.847Z",
-  "startPage": 1,
-  "requestedPageCount": 20,
-  "fetchedPageCount": 20,
+  "savedAt": "2026-02-22T05:29:13.978Z",
+  "startPage": 695,
+  "requestedPageCount": 2,
+  "fetchedPageCount": 2,
   "pages": [
     {
-      "pageIndex": 1,
-      "imageUrl": "https://digi.vatlib.it/iiifimage/MSS_Vat.ebr.19/Vat.ebr.19_0001_al_piatto.anteriore.jp2/full/full/0/default.jpg",
-      "fileName": "p0001.jpg",
-      "width": 1837,
-      "height": 2271
+      "pageIndex": 695,
+      "imageUrl": "https://digi.vatlib.it/iiifimage/MSS_Vat.ebr.19/Vat.ebr.19_0695_zx_colorchecker.jp2/full/full/0/default.jpg",
+      "fileName": "p0695.jpg",
+      "width": 3260,
+      "height": 2663
     },
     {
-      "pageIndex": 2,
-      "imageUrl": "https://digi.vatlib.it/iiifimage/MSS_Vat.ebr.19/Vat.ebr.19_0002_ba_risguardia.anteriore.jp2/full/full/0/default.jpg",
-      "fileName": "p0002.jpg",
-      "width": 1645,
-      "height": 2207
-    },
-    {
-      "pageIndex": 3,
-      "imageUrl": "https://digi.vatlib.it/iiifimage/MSS_Vat.ebr.19/Vat.ebr.19_0003_cy_0001r.jp2/full/full/0/default.jpg",
-      "fileName": "p0003.jpg",
-      "width": 1627,
-      "height": 2151
-    },
-    {
-      "pageIndex": 4,
-      "imageUrl": "https://digi.vatlib.it/iiifimage/MSS_Vat.ebr.19/Vat.ebr.19_0004_cy_0001v.jp2/full/full/0/default.jpg",
-      "fileName": "p0004.jpg",
-      "width": 1625,
-      "height": 2099
-    },
-    {
-      "pageIndex": 5,
-      "imageUrl": "https://digi.vatlib.it/iiifimage/MSS_Vat.ebr.19/Vat.ebr.19_0005_fa_0001r.jp2/full/full/0/default.jpg",
-      "fileName": "p0005.jpg",
-      "width": 1605,
-      "height": 2097
-    },
-    {
-      "pageIndex": 6,
-      "imageUrl": "https://digi.vatlib.it/iiifimage/MSS_Vat.ebr.19/Vat.ebr.19_0006_fa_0001v.jp2/full/full/0/default.jpg",
-      "fileName": "p0006.jpg",
-      "width": 1625,
-      "height": 2099
-    },
-    {
-      "pageIndex": 7,
-      "imageUrl": "https://digi.vatlib.it/iiifimage/MSS_Vat.ebr.19/Vat.ebr.19_0007_fa_0002r.jp2/full/full/0/default.jpg",
-      "fileName": "p0007.jpg",
-      "width": 1605,
-      "height": 2097
-    },
-    {
-      "pageIndex": 8,
-      "imageUrl": "https://digi.vatlib.it/iiifimage/MSS_Vat.ebr.19/Vat.ebr.19_0008_fa_0002v.jp2/full/full/0/default.jpg",
-      "fileName": "p0008.jpg",
-      "width": 1625,
-      "height": 2099
-    },
-    {
-      "pageIndex": 9,
-      "imageUrl": "https://digi.vatlib.it/iiifimage/MSS_Vat.ebr.19/Vat.ebr.19_0009_fa_0003r.jp2/full/full/0/default.jpg",
-      "fileName": "p0009.jpg",
-      "width": 1605,
-      "height": 2097
-    },
-    {
-      "pageIndex": 10,
-      "imageUrl": "https://digi.vatlib.it/iiifimage/MSS_Vat.ebr.19/Vat.ebr.19_0010_fa_0003v.jp2/full/full/0/default.jpg",
-      "fileName": "p0010.jpg",
-      "width": 1625,
-      "height": 2099
-    },
-    {
-      "pageIndex": 11,
-      "imageUrl": "https://digi.vatlib.it/iiifimage/MSS_Vat.ebr.19/Vat.ebr.19_0011_fa_0004r.jp2/full/full/0/default.jpg",
-      "fileName": "p0011.jpg",
-      "width": 1605,
-      "height": 2097
-    },
-    {
-      "pageIndex": 12,
-      "imageUrl": "https://digi.vatlib.it/iiifimage/MSS_Vat.ebr.19/Vat.ebr.19_0012_fa_0004v.jp2/full/full/0/default.jpg",
-      "fileName": "p0012.jpg",
-      "width": 1625,
-      "height": 2099
-    },
-    {
-      "pageIndex": 13,
-      "imageUrl": "https://digi.vatlib.it/iiifimage/MSS_Vat.ebr.19/Vat.ebr.19_0013_fa_0005r.jp2/full/full/0/default.jpg",
-      "fileName": "p0013.jpg",
-      "width": 1605,
-      "height": 2097
-    },
-    {
-      "pageIndex": 14,
-      "imageUrl": "https://digi.vatlib.it/iiifimage/MSS_Vat.ebr.19/Vat.ebr.19_0014_fa_0005v.jp2/full/full/0/default.jpg",
-      "fileName": "p0014.jpg",
-      "width": 1625,
-      "height": 2099
-    },
-    {
-      "pageIndex": 15,
-      "imageUrl": "https://digi.vatlib.it/iiifimage/MSS_Vat.ebr.19/Vat.ebr.19_0015_fa_0006r.jp2/full/full/0/default.jpg",
-      "fileName": "p0015.jpg",
-      "width": 1605,
-      "height": 2097
-    },
-    {
-      "pageIndex": 16,
-      "imageUrl": "https://digi.vatlib.it/iiifimage/MSS_Vat.ebr.19/Vat.ebr.19_0016_fa_0006v.jp2/full/full/0/default.jpg",
-      "fileName": "p0016.jpg",
-      "width": 1625,
-      "height": 2099
-    },
-    {
-      "pageIndex": 17,
-      "imageUrl": "https://digi.vatlib.it/iiifimage/MSS_Vat.ebr.19/Vat.ebr.19_0017_fa_0007r.jp2/full/full/0/default.jpg",
-      "fileName": "p0017.jpg",
-      "width": 1605,
-      "height": 2097
-    },
-    {
-      "pageIndex": 18,
-      "imageUrl": "https://digi.vatlib.it/iiifimage/MSS_Vat.ebr.19/Vat.ebr.19_0018_fa_0007v.jp2/full/full/0/default.jpg",
-      "fileName": "p0018.jpg",
-      "width": 1625,
-      "height": 2099
-    },
-    {
-      "pageIndex": 19,
-      "imageUrl": "https://digi.vatlib.it/iiifimage/MSS_Vat.ebr.19/Vat.ebr.19_0019_fa_0008r.jp2/full/full/0/default.jpg",
-      "fileName": "p0019.jpg",
-      "width": 1605,
-      "height": 2097
-    },
-    {
-      "pageIndex": 20,
-      "imageUrl": "https://digi.vatlib.it/iiifimage/MSS_Vat.ebr.19/Vat.ebr.19_0020_fa_0008v.jp2/full/full/0/default.jpg",
-      "fileName": "p0020.jpg",
-      "width": 1625,
-      "height": 2099
+      "pageIndex": 696,
+      "imageUrl": "https://digi.vatlib.it/iiifimage/MSS_Vat.ebr.19/Vat.ebr.19_0696_zz_scala.millimetrica.jp2/full/full/0/default.jpg",
+      "fileName": "p0696.jpg",
+      "width": 3287,
+      "height": 2340
     }
   ]
 }

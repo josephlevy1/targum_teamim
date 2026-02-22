@@ -135,7 +135,7 @@ export function shouldStopBatch(input: {
   };
 }
 
-async function ensureSourcePages(args: ManuscriptImportArgs): Promise<{ rawPagesDir: string }> {
+async function ensureSourcePages(args: ManuscriptImportArgs): Promise<{ rawPagesDir: string; isMaterializedWindow: boolean }> {
   const repo = getRepository();
   const witness = repo.getWitness(args.witnessId);
   if (!witness) {
@@ -150,6 +150,7 @@ async function ensureSourcePages(args: ManuscriptImportArgs): Promise<{ rawPages
     });
     return {
       rawPagesDir: materialized.rawPagesDir,
+      isMaterializedWindow: true,
     };
   }
 
@@ -158,7 +159,7 @@ async function ensureSourcePages(args: ManuscriptImportArgs): Promise<{ rawPages
     throw new Error(`Raw pages directory not found for ${args.witnessId}: ${rawPagesDir}`);
   }
 
-  return { rawPagesDir };
+  return { rawPagesDir, isMaterializedWindow: false };
 }
 
 function writeRunReport(summary: Omit<ManuscriptImportSummary, "reportJsonPath" | "reportMarkdownPath">): {
@@ -243,21 +244,35 @@ export async function runManuscriptImport(args: ManuscriptImportArgs): Promise<M
   let windowedPages: ReturnType<typeof repo.listPagesByWitness> = [];
   try {
     const workDir = path.join(witnessRunsDir(args.witnessId), "_window");
-    const staged = stageWindowPages({
-      sourceDir: source.rawPagesDir,
-      outputDir: workDir,
-      startPage: args.startPage,
-      pageCount: args.pageCount,
-    });
+    let imported: ReturnType<typeof repo.importPagesFromDirectory>;
+    let stagedStartIndex = args.startPage;
+    let stagedCount = 0;
 
-    const imported = repo.importPagesFromDirectory({
-      witnessId: args.witnessId,
-      directoryPath: workDir,
-      startIndex: staged.startIndex,
-    });
+    if (source.isMaterializedWindow) {
+      imported = repo.importPagesFromDirectory({
+        witnessId: args.witnessId,
+        directoryPath: source.rawPagesDir,
+        startIndex: args.startPage,
+      });
+      stagedCount = Math.max(1, args.pageCount);
+    } else {
+      const staged = stageWindowPages({
+        sourceDir: source.rawPagesDir,
+        outputDir: workDir,
+        startPage: args.startPage,
+        pageCount: args.pageCount,
+      });
+      stagedStartIndex = staged.startIndex;
+      stagedCount = staged.stagedFiles.length;
+      imported = repo.importPagesFromDirectory({
+        witnessId: args.witnessId,
+        directoryPath: workDir,
+        startIndex: staged.startIndex,
+      });
+    }
 
     windowedPages = imported.pages.filter(
-      (page) => page.pageIndex >= staged.startIndex && page.pageIndex < staged.startIndex + staged.stagedFiles.length,
+      (page) => page.pageIndex >= stagedStartIndex && page.pageIndex < stagedStartIndex + stagedCount,
     );
 
     const thumbsDir = path.join(root, "data", "imports", "manuscripts", args.witnessId, "thumbnails");

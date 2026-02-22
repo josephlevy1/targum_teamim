@@ -146,19 +146,52 @@ export function stageWindowPages(input: {
   }
 
   const startIndex = Math.max(1, input.startPage);
-  const endIndex = Math.min(files.length, startIndex + Math.max(1, input.pageCount) - 1);
-  if (startIndex > files.length) {
-    throw new Error(`start-page ${startIndex} exceeds available pages (${files.length}).`);
-  }
+  const requestedCount = Math.max(1, input.pageCount);
+  const numberedEntries = files.map((filePath) => {
+    const base = path.basename(filePath);
+    const m = base.match(/(\d+)(?=\.[^.]+$)/);
+    return {
+      filePath,
+      pageIndex: m ? Number(m[1]) : Number.NaN,
+    };
+  });
+  const allNumbered = numberedEntries.every((entry) => Number.isFinite(entry.pageIndex));
 
   clearDirectory(input.outputDir);
   const staged: string[] = [];
-  for (let pageIndex = startIndex; pageIndex <= endIndex; pageIndex += 1) {
-    const sourceFile = files[pageIndex - 1];
-    const ext = fileExtForPath(sourceFile);
-    const target = path.join(input.outputDir, `${String(pageIndex).padStart(4, "0")}${ext}`);
-    fs.copyFileSync(sourceFile, target);
-    staged.push(target);
+
+  if (allNumbered) {
+    const byIndex = new Map<number, string>();
+    for (const entry of numberedEntries) {
+      byIndex.set(entry.pageIndex, entry.filePath);
+    }
+    const maxIndex = Math.max(...numberedEntries.map((entry) => entry.pageIndex));
+    if (!byIndex.has(startIndex)) {
+      throw new Error(`start-page ${startIndex} exceeds available pages (${maxIndex}).`);
+    }
+
+    const endIndex = startIndex + requestedCount - 1;
+    for (let pageIndex = startIndex; pageIndex <= endIndex; pageIndex += 1) {
+      const sourceFile = byIndex.get(pageIndex);
+      if (!sourceFile) break;
+      const ext = fileExtForPath(sourceFile);
+      const target = path.join(input.outputDir, `${String(pageIndex).padStart(4, "0")}${ext}`);
+      fs.copyFileSync(sourceFile, target);
+      staged.push(target);
+    }
+  } else {
+    const endIndex = Math.min(files.length, startIndex + requestedCount - 1);
+    if (startIndex > files.length) {
+      throw new Error(`start-page ${startIndex} exceeds available pages (${files.length}).`);
+    }
+
+    for (let pageIndex = startIndex; pageIndex <= endIndex; pageIndex += 1) {
+      const sourceFile = files[pageIndex - 1];
+      const ext = fileExtForPath(sourceFile);
+      const target = path.join(input.outputDir, `${String(pageIndex).padStart(4, "0")}${ext}`);
+      fs.copyFileSync(sourceFile, target);
+      staged.push(target);
+    }
   }
 
   return {
