@@ -21,6 +21,7 @@ type WitnessRow = {
   regionsEligibleForOcr: number;
   regionsTagged: number;
   ocrArtifacts: number;
+  ocrJobsCompleted: number;
   ocrJobsQueued: number;
   ocrJobsRunning: number;
   ocrJobsFailed: number;
@@ -41,8 +42,9 @@ type DashboardPayload = {
     regionsTagged: number;
     regionsEligibleForOcr: number;
     ocrArtifacts: number;
+    ocrCompleted: number;
     ocrQueued: number;
-    ocrRunning: number;
+    ocrCurrent: number;
     ocrFailed: number;
     splitRows: number;
     blockedSources: number;
@@ -145,7 +147,8 @@ export default function ManuscriptsDashboardPage() {
         <article className="panel"><strong>Pages Imported</strong><div>{summary?.pagesImported ?? "-"}</div></article>
         <article className="panel"><strong>OCR Tagged/Eligible</strong><div>{summary ? `${summary.regionsTagged}/${summary.regionsEligibleForOcr}` : "-"}</div></article>
         <article className="panel"><strong>OCR Artifacts</strong><div>{summary?.ocrArtifacts ?? "-"}</div></article>
-        <article className="panel"><strong>OCR Queue/Run/Fail</strong><div>{summary ? `${summary.ocrQueued}/${summary.ocrRunning}/${summary.ocrFailed}` : "-"}</div></article>
+        <article className="panel"><strong>OCR Jobs C/Cur/Q</strong><div>{summary ? `${summary.ocrCompleted}/${summary.ocrCurrent}/${summary.ocrQueued}` : "-"}</div></article>
+        <article className="panel"><strong>OCR Failed Jobs</strong><div>{summary?.ocrFailed ?? "-"}</div></article>
         <article className="panel"><strong>Split Rows</strong><div>{summary?.splitRows ?? "-"}</div></article>
         <article className="panel"><strong>Blocked Sources</strong><div>{summary?.blockedSources ?? "-"}</div></article>
         <article className="panel"><strong>Completed Sources</strong><div>{summary?.completedSources ?? "-"}</div></article>
@@ -186,7 +189,8 @@ export default function ManuscriptsDashboardPage() {
                   </td>
                   <td style={{ padding: "0.35rem" }}>
                     <div>done {row.ocrArtifacts}</div>
-                    <div className="small">q/r/f {row.ocrJobsQueued}/{row.ocrJobsRunning}/{row.ocrJobsFailed}</div>
+                    <div className="small">c/cur/q {row.ocrJobsCompleted}/{row.ocrJobsRunning}/{row.ocrJobsQueued}</div>
+                    <div className="small">failed {row.ocrJobsFailed}</div>
                   </td>
                   <td style={{ padding: "0.35rem" }}>
                     <div>rows {row.splitRows}</div>

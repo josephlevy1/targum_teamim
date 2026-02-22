@@ -12,8 +12,9 @@ export async function GET() {
       acc.regionsTagged += row.regionsTagged;
       acc.regionsEligibleForOcr += row.regionsEligibleForOcr;
       acc.ocrArtifacts += row.ocrArtifacts;
+      acc.ocrCompleted += row.ocrJobsCompleted;
       acc.ocrQueued += row.ocrJobsQueued;
-      acc.ocrRunning += row.ocrJobsRunning;
+      acc.ocrCurrent += row.ocrJobsRunning;
       acc.ocrFailed += row.ocrJobsFailed;
       acc.splitRows += row.splitRows;
       if (row.ocrStatus === "blocked") acc.blockedSources += 1;
@@ -26,8 +27,9 @@ export async function GET() {
       regionsTagged: 0,
       regionsEligibleForOcr: 0,
       ocrArtifacts: 0,
+      ocrCompleted: 0,
       ocrQueued: 0,
-      ocrRunning: 0,
+      ocrCurrent: 0,
       ocrFailed: 0,
       splitRows: 0,
       blockedSources: 0,
