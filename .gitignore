@@ -22,6 +22,11 @@ packages/*/dist/
 /data/imports/full_torah_checkpoint.json
 /data/imports/torah_scrape_manifest.json
 /book_sources/
+/data/imports/manuscripts/crops/
+/data/imports/manuscripts/*/raw-pages/
+/data/imports/manuscripts/*/thumbnails/
+/data/imports/manuscripts/*/runs/
+/docs/import-runs/
 
 # Environment
 .env

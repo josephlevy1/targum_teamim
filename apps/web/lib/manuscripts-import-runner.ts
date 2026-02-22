@@ -286,6 +286,21 @@ export async function runManuscriptImport(args: ManuscriptImportArgs): Promise<M
               ? "Auto calibration region with temporary verse range."
               : "Auto-proposed full-page region. Requires review + verse range tagging before OCR.",
         });
+      } else if (args.mode === "calibration") {
+        const tagged = regions.some((region) => Boolean(region.startVerseId) && Boolean(region.endVerseId));
+        if (!tagged) {
+          const region = regions[0];
+          repo.upsertPageRegion({
+            id: region.id,
+            pageId: region.pageId,
+            regionIndex: region.regionIndex,
+            bbox: region.bbox,
+            startVerseId: "Genesis:1:1",
+            endVerseId: "Genesis:1:1",
+            status: "ok",
+            notes: `${region.notes} | Calibration auto-tag applied.`,
+          });
+        }
       }
     }
 
