@@ -175,6 +175,7 @@ export interface ManuscriptOpsWitnessSnapshot {
   regionsEligibleForOcr: number;
   regionsTagged: number;
   ocrArtifacts: number;
+  ocrJobsCompleted: number;
   ocrJobsQueued: number;
   ocrJobsRunning: number;
   ocrJobsFailed: number;
@@ -1527,6 +1528,11 @@ export class TargumRepository {
               FROM ocr_jobs j
               JOIN page_regions r ON r.id = j.region_id
               JOIN pages p ON p.id = r.page_id
+             WHERE p.witness_id = w.id AND j.status = 'completed') AS ocr_jobs_completed,
+           (SELECT COUNT(*)
+              FROM ocr_jobs j
+              JOIN page_regions r ON r.id = j.region_id
+              JOIN pages p ON p.id = r.page_id
              WHERE p.witness_id = w.id AND j.status = 'queued') AS ocr_jobs_queued,
            (SELECT COUNT(*)
               FROM ocr_jobs j
@@ -1569,6 +1575,7 @@ export class TargumRepository {
       regions_eligible_for_ocr: number;
       regions_tagged: number;
       ocr_artifacts: number;
+      ocr_jobs_completed: number;
       ocr_jobs_queued: number;
       ocr_jobs_running: number;
       ocr_jobs_failed: number;
@@ -1598,6 +1605,7 @@ export class TargumRepository {
       regionsEligibleForOcr: row.regions_eligible_for_ocr,
       regionsTagged: row.regions_tagged,
       ocrArtifacts: row.ocr_artifacts,
+      ocrJobsCompleted: row.ocr_jobs_completed,
       ocrJobsQueued: row.ocr_jobs_queued,
       ocrJobsRunning: row.ocr_jobs_running,
       ocrJobsFailed: row.ocr_jobs_failed,
