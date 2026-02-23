@@ -418,6 +418,8 @@ export async function remapWitnessRegionsBySnippet(input: {
   minScore?: number;
   minMargin?: number;
   maxWindow?: number;
+  pageIndexStart?: number;
+  pageIndexEnd?: number;
 }): Promise<{ witnessId: string; total: number; assigned: number; ambiguous: number; unassigned: number }> {
   const repo = getRepository();
   const minScore = input.minScore ?? 0.78;
@@ -425,7 +427,14 @@ export async function remapWitnessRegionsBySnippet(input: {
   const maxWindow = input.maxWindow ?? 5;
   const verseIds = repo.listVerseIds().sort(compareVerseIdsCanonical);
   const baselineByVerse = new Map(verseIds.map((id) => [id, normalizeComparisonText(renderAramaicFromVerseId(id))]));
-  const regions = repo.listRegionsByWitness(input.witnessId);
+  const regions = repo.listRegionsByWitness(input.witnessId).filter((region) => {
+    if (input.pageIndexStart === undefined && input.pageIndexEnd === undefined) return true;
+    const page = repo.getPage(region.pageId);
+    if (!page) return false;
+    if (input.pageIndexStart !== undefined && page.pageIndex < input.pageIndexStart) return false;
+    if (input.pageIndexEnd !== undefined && page.pageIndex > input.pageIndexEnd) return false;
+    return true;
+  });
 
   let assigned = 0;
   let ambiguous = 0;
@@ -520,6 +529,37 @@ export async function backfillWitnessFromRemap(witnessId: string): Promise<{ wit
     }
   }
   return { witnessId, regions: regions.length, versesTouched: touched.size };
+}
+
+export async function backfillWitnessFromRemapRange(input: {
+  witnessId: string;
+  pageIndexStart?: number;
+  pageIndexEnd?: number;
+}): Promise<{ witnessId: string; regions: number; versesTouched: number }> {
+  const repo = getRepository();
+  const regions = repo
+    .listRegionsByWitness(input.witnessId)
+    .filter((region) => {
+      if (input.pageIndexStart === undefined && input.pageIndexEnd === undefined) return true;
+      const page = repo.getPage(region.pageId);
+      if (!page) return false;
+      if (input.pageIndexStart !== undefined && page.pageIndex < input.pageIndexStart) return false;
+      if (input.pageIndexEnd !== undefined && page.pageIndex > input.pageIndexEnd) return false;
+      return true;
+    })
+    .filter((r) => r.startVerseId && r.endVerseId)
+    .filter((r) => !r.remapReviewRequired);
+
+  const touched = new Set<string>();
+  for (const region of regions) {
+    const result = await splitRegionIntoWitnessVerses(region.id);
+    for (const verseId of result.verseIds) {
+      touched.add(verseId);
+      recomputeSourceConfidence(verseId);
+      recomputeCascadeForVerse(verseId);
+    }
+  }
+  return { witnessId: input.witnessId, regions: regions.length, versesTouched: touched.size };
 }
 
 export function runTaamAlignmentForVerse(verseId: string, targetLayer = "working_text"): {
