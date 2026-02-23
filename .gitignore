@@ -11,6 +11,7 @@ packages/*/dist/
 *.tsbuildinfo
 
 # Local data
+/data
 /data/app.db
 /data/exports/
 /data/verses/
