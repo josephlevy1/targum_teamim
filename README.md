@@ -140,6 +140,15 @@ Manuscript exports/review:
 - `GET /api/manuscripts/export/confidence`
 - `GET /api/manuscripts/export/diffs`
 - `GET /api/manuscripts/jobs/ocr`
+- `POST /api/manuscripts/retag/remap`
+- `POST /api/manuscripts/taamim/align/run`
+- `POST /api/manuscripts/taamim/cascade/recompute`
+- `GET /api/manuscripts/verse/:verseId/taamim/witnesses`
+- `GET /api/manuscripts/verse/:verseId/taamim/consensus`
+- `POST /api/manuscripts/verse/:verseId/taamim/apply-consensus`
+- `GET /api/manuscripts/monitoring/summary`
+- `GET /api/manuscripts/monitoring/jobs`
+- `GET /api/manuscripts/monitoring/system`
 
 When signed out, mutation routes return `401`. Patch entries are attributed to Clerk username (fallback to email local-part, then user-id prefix).
 
@@ -171,3 +180,4 @@ Runbooks:
 
 - `docs/issue-1-mac-mini-uptime.md`
 - `docs/next-steps-issue2.md`
+- `docs/m1-8gb-runtime-profile.md`

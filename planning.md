@@ -193,3 +193,13 @@ If not provided, build tools/UI to capture mapping iteratively.
 - Required status checks: `quality-checks`, `validate-pr-body`.
 - Strict required status checks and admin enforcement are enabled.
 - Verification record: `docs/branch-protection-verification-2026-02-20.md`.
+
+## Implementation Update (2026-02-23)
+- Added OCR snippet-based remap flow for out-of-order witness pages/regions with conservative confidence+margin policy.
+- Added remap metadata persistence on `page_regions` for audit/review workflows.
+- Added ta'am witness-alignment storage + working consensus storage and corresponding APIs.
+- Added `/manuscripts/monitoring` page and monitoring APIs for summary/jobs/system telemetry.
+- Added M1 Mac Mini (8GB) runtime tuning defaults:
+  - batch default 50 pages
+  - runtime telemetry fields in run-state (`rss_mb`, `cpu_pct`, `queue_depth`, `throttle_state`)
+  - throttling profile (`normal` -> `reduced` -> `single`) based on RSS thresholds.

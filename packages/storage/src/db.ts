@@ -60,6 +60,10 @@ export interface PageRegionRecord {
   bbox: { x: number; y: number; w: number; h: number };
   startVerseId: string | null;
   endVerseId: string | null;
+  remapMethod: string | null;
+  remapConfidence: number | null;
+  remapCandidates: Array<{ startVerseId: string; endVerseId: string; score: number }>;
+  remapReviewRequired: boolean;
   status: ManuscriptStatus;
   notes: string;
   createdAt: string;
@@ -137,6 +141,44 @@ export interface OcrJobRecord {
   finishedAt?: string;
 }
 
+export interface TaamAlignmentRecord {
+  id: string;
+  verseId: string;
+  witnessId: string;
+  targetLayer: string;
+  targetTextHash: string;
+  taam: Array<Record<string, unknown>>;
+  metrics: Record<string, unknown>;
+  status: ManuscriptStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WorkingTaamConsensusRecord {
+  verseId: string;
+  targetLayer: string;
+  targetTextHash: string;
+  consensusTaam: Array<Record<string, unknown>>;
+  ensembleConfidence: number;
+  flags: string[];
+  reasonCodes: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TaamAlignmentJobRecord {
+  id: string;
+  witnessId: string | null;
+  verseRange: string | null;
+  kind: "align" | "cascade";
+  status: "queued" | "running" | "completed" | "failed";
+  attempts: number;
+  error?: string;
+  createdAt: string;
+  startedAt?: string;
+  finishedAt?: string;
+}
+
 export type RunStage = "ingest" | "ocr" | "split" | "confidence";
 export type RunStageStatus = "pending" | "running" | "completed" | "failed" | "blocked";
 
@@ -155,6 +197,10 @@ export interface WitnessRunStateRecord {
   splitStatus: RunStageStatus;
   confidenceStatus: RunStageStatus;
   blockers: RunBlocker[];
+  rssMb: number;
+  cpuPct: number;
+  queueDepth: number;
+  throttleState: "normal" | "reduced" | "single";
   updatedAt: string;
 }
 
@@ -169,6 +215,10 @@ export interface ManuscriptOpsWitnessSnapshot {
   splitStatus: RunStageStatus;
   confidenceStatus: RunStageStatus;
   runStateUpdatedAt: string;
+  rssMb: number;
+  cpuPct: number;
+  queueDepth: number;
+  throttleState: "normal" | "reduced" | "single";
   pagesImported: number;
   maxPageIndex: number;
   regionsTotal: number;
@@ -324,6 +374,10 @@ export class TargumRepository {
         bbox_json TEXT NOT NULL,
         start_verse_id TEXT,
         end_verse_id TEXT,
+        remap_method TEXT,
+        remap_confidence REAL,
+        remap_candidates_json TEXT NOT NULL DEFAULT '[]',
+        remap_review_required INTEGER NOT NULL DEFAULT 0,
         status TEXT NOT NULL DEFAULT 'ok',
         notes TEXT NOT NULL DEFAULT '',
         created_at TEXT NOT NULL,
@@ -426,6 +480,10 @@ export class TargumRepository {
         split_status TEXT NOT NULL DEFAULT 'pending',
         confidence_status TEXT NOT NULL DEFAULT 'pending',
         blockers_json TEXT NOT NULL DEFAULT '[]',
+        rss_mb REAL NOT NULL DEFAULT 0,
+        cpu_pct REAL NOT NULL DEFAULT 0,
+        queue_depth INTEGER NOT NULL DEFAULT 0,
+        throttle_state TEXT NOT NULL DEFAULT 'normal',
         updated_at TEXT NOT NULL,
         FOREIGN KEY (witness_id) REFERENCES witnesses(id)
       );
@@ -470,6 +528,52 @@ export class TargumRepository {
         FOREIGN KEY (witness_id) REFERENCES witnesses(id)
       );
       CREATE INDEX IF NOT EXISTS idx_manuscript_fetch_runs_witness ON manuscript_fetch_runs(witness_id, created_at DESC);
+
+      CREATE TABLE IF NOT EXISTS witness_taam_alignments (
+        id TEXT PRIMARY KEY,
+        verse_id TEXT NOT NULL,
+        witness_id TEXT NOT NULL,
+        target_layer TEXT NOT NULL,
+        target_text_hash TEXT NOT NULL,
+        taam_json TEXT NOT NULL DEFAULT '[]',
+        metrics_json TEXT NOT NULL DEFAULT '{}',
+        status TEXT NOT NULL DEFAULT 'partial',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        UNIQUE(verse_id, witness_id, target_layer, target_text_hash),
+        FOREIGN KEY (verse_id) REFERENCES verses(verse_id),
+        FOREIGN KEY (witness_id) REFERENCES witnesses(id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_witness_taam_alignments_verse ON witness_taam_alignments(verse_id);
+      CREATE INDEX IF NOT EXISTS idx_witness_taam_alignments_witness ON witness_taam_alignments(witness_id);
+
+      CREATE TABLE IF NOT EXISTS working_taam_consensus (
+        verse_id TEXT PRIMARY KEY,
+        target_layer TEXT NOT NULL,
+        target_text_hash TEXT NOT NULL,
+        consensus_taam_json TEXT NOT NULL DEFAULT '[]',
+        ensemble_confidence REAL NOT NULL DEFAULT 0,
+        flags_json TEXT NOT NULL DEFAULT '[]',
+        reason_codes_json TEXT NOT NULL DEFAULT '[]',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY (verse_id) REFERENCES verses(verse_id)
+      );
+
+      CREATE TABLE IF NOT EXISTS taam_alignment_jobs (
+        id TEXT PRIMARY KEY,
+        witness_id TEXT,
+        verse_range TEXT,
+        kind TEXT NOT NULL,
+        status TEXT NOT NULL,
+        attempts INTEGER NOT NULL DEFAULT 0,
+        error TEXT,
+        created_at TEXT NOT NULL,
+        started_at TEXT,
+        finished_at TEXT,
+        FOREIGN KEY (witness_id) REFERENCES witnesses(id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_taam_alignment_jobs_status ON taam_alignment_jobs(status, created_at DESC);
     `);
 
     const verseStateColumns = this.db
@@ -492,6 +596,34 @@ export class TargumRepository {
     const ocrArtifactColumns = this.db.prepare("PRAGMA table_info(region_ocr_artifacts)").all() as Array<{ name: string }>;
     if (!ocrArtifactColumns.some((column) => column.name === "crop_metadata_json")) {
       this.db.exec("ALTER TABLE region_ocr_artifacts ADD COLUMN crop_metadata_json TEXT NOT NULL DEFAULT '{}'");
+    }
+
+    const pageRegionColumns = this.db.prepare("PRAGMA table_info(page_regions)").all() as Array<{ name: string }>;
+    if (!pageRegionColumns.some((column) => column.name === "remap_method")) {
+      this.db.exec("ALTER TABLE page_regions ADD COLUMN remap_method TEXT");
+    }
+    if (!pageRegionColumns.some((column) => column.name === "remap_confidence")) {
+      this.db.exec("ALTER TABLE page_regions ADD COLUMN remap_confidence REAL");
+    }
+    if (!pageRegionColumns.some((column) => column.name === "remap_candidates_json")) {
+      this.db.exec("ALTER TABLE page_regions ADD COLUMN remap_candidates_json TEXT NOT NULL DEFAULT '[]'");
+    }
+    if (!pageRegionColumns.some((column) => column.name === "remap_review_required")) {
+      this.db.exec("ALTER TABLE page_regions ADD COLUMN remap_review_required INTEGER NOT NULL DEFAULT 0");
+    }
+
+    const runStateColumns = this.db.prepare("PRAGMA table_info(manuscript_run_state)").all() as Array<{ name: string }>;
+    if (!runStateColumns.some((column) => column.name === "rss_mb")) {
+      this.db.exec("ALTER TABLE manuscript_run_state ADD COLUMN rss_mb REAL NOT NULL DEFAULT 0");
+    }
+    if (!runStateColumns.some((column) => column.name === "cpu_pct")) {
+      this.db.exec("ALTER TABLE manuscript_run_state ADD COLUMN cpu_pct REAL NOT NULL DEFAULT 0");
+    }
+    if (!runStateColumns.some((column) => column.name === "queue_depth")) {
+      this.db.exec("ALTER TABLE manuscript_run_state ADD COLUMN queue_depth INTEGER NOT NULL DEFAULT 0");
+    }
+    if (!runStateColumns.some((column) => column.name === "throttle_state")) {
+      this.db.exec("ALTER TABLE manuscript_run_state ADD COLUMN throttle_state TEXT NOT NULL DEFAULT 'normal'");
     }
   }
 
@@ -790,6 +922,10 @@ export class TargumRepository {
     bbox: { x: number; y: number; w: number; h: number };
     startVerseId?: string | null;
     endVerseId?: string | null;
+    remapMethod?: string | null;
+    remapConfidence?: number | null;
+    remapCandidates?: Array<{ startVerseId: string; endVerseId: string; score: number }>;
+    remapReviewRequired?: boolean;
     status?: ManuscriptStatus;
     notes?: string;
   }): PageRegionRecord {
@@ -798,14 +934,18 @@ export class TargumRepository {
 
     this.db
       .prepare(
-        `INSERT INTO page_regions (id, page_id, region_index, bbox_json, start_verse_id, end_verse_id, status, notes, created_at, updated_at)
-         VALUES (@id, @pageId, @regionIndex, @bboxJson, @startVerseId, @endVerseId, @status, @notes, @now, @now)
+        `INSERT INTO page_regions (id, page_id, region_index, bbox_json, start_verse_id, end_verse_id, remap_method, remap_confidence, remap_candidates_json, remap_review_required, status, notes, created_at, updated_at)
+         VALUES (@id, @pageId, @regionIndex, @bboxJson, @startVerseId, @endVerseId, @remapMethod, @remapConfidence, @remapCandidatesJson, @remapReviewRequired, @status, @notes, @now, @now)
          ON CONFLICT(id) DO UPDATE SET
            page_id = excluded.page_id,
            region_index = excluded.region_index,
            bbox_json = excluded.bbox_json,
            start_verse_id = excluded.start_verse_id,
            end_verse_id = excluded.end_verse_id,
+           remap_method = excluded.remap_method,
+           remap_confidence = excluded.remap_confidence,
+           remap_candidates_json = excluded.remap_candidates_json,
+           remap_review_required = excluded.remap_review_required,
            status = excluded.status,
            notes = excluded.notes,
            updated_at = excluded.updated_at`,
@@ -817,6 +957,10 @@ export class TargumRepository {
         bboxJson: JSON.stringify(input.bbox),
         startVerseId: input.startVerseId ?? null,
         endVerseId: input.endVerseId ?? null,
+        remapMethod: input.remapMethod ?? null,
+        remapConfidence: input.remapConfidence ?? null,
+        remapCandidatesJson: JSON.stringify(input.remapCandidates ?? []),
+        remapReviewRequired: input.remapReviewRequired ? 1 : 0,
         status: input.status ?? "ok",
         notes: input.notes ?? "",
         now,
@@ -830,7 +974,7 @@ export class TargumRepository {
   getPageRegion(id: string): PageRegionRecord | null {
     const row = this.db
       .prepare(
-        `SELECT id, page_id, region_index, bbox_json, start_verse_id, end_verse_id, status, notes, created_at, updated_at
+        `SELECT id, page_id, region_index, bbox_json, start_verse_id, end_verse_id, remap_method, remap_confidence, remap_candidates_json, remap_review_required, status, notes, created_at, updated_at
          FROM page_regions WHERE id = ?`,
       )
       .get(id) as
@@ -841,6 +985,10 @@ export class TargumRepository {
           bbox_json: string;
           start_verse_id: string | null;
           end_verse_id: string | null;
+          remap_method: string | null;
+          remap_confidence: number | null;
+          remap_candidates_json: string;
+          remap_review_required: number;
           status: ManuscriptStatus;
           notes: string;
           created_at: string;
@@ -856,6 +1004,10 @@ export class TargumRepository {
       bbox: JSON.parse(row.bbox_json),
       startVerseId: row.start_verse_id,
       endVerseId: row.end_verse_id,
+      remapMethod: row.remap_method,
+      remapConfidence: row.remap_confidence,
+      remapCandidates: JSON.parse(row.remap_candidates_json ?? "[]"),
+      remapReviewRequired: Boolean(row.remap_review_required),
       status: row.status,
       notes: row.notes,
       createdAt: row.created_at,
@@ -1307,6 +1459,295 @@ export class TargumRepository {
     }));
   }
 
+  createTaamAlignmentJob(input: { kind: "align" | "cascade"; witnessId?: string | null; verseRange?: string | null }): TaamAlignmentJobRecord {
+    const now = new Date().toISOString();
+    const id = crypto.randomUUID();
+    this.db
+      .prepare(
+        `INSERT INTO taam_alignment_jobs (id, witness_id, verse_range, kind, status, attempts, error, created_at, started_at, finished_at)
+         VALUES (?, ?, ?, ?, 'queued', 0, null, ?, null, null)`,
+      )
+      .run(id, input.witnessId ?? null, input.verseRange ?? null, input.kind, now);
+    return this.getTaamAlignmentJob(id) as TaamAlignmentJobRecord;
+  }
+
+  updateTaamAlignmentJobStatus(id: string, status: "queued" | "running" | "completed" | "failed", error?: string): TaamAlignmentJobRecord | null {
+    const now = new Date().toISOString();
+    if (status === "running") {
+      this.db
+        .prepare("UPDATE taam_alignment_jobs SET status = ?, attempts = attempts + 1, error = NULL, started_at = ? WHERE id = ?")
+        .run(status, now, id);
+    } else if (status === "failed") {
+      this.db
+        .prepare("UPDATE taam_alignment_jobs SET status = ?, error = ?, finished_at = ? WHERE id = ?")
+        .run(status, error ?? "unknown error", now, id);
+    } else if (status === "completed") {
+      this.db
+        .prepare("UPDATE taam_alignment_jobs SET status = ?, error = NULL, finished_at = ? WHERE id = ?")
+        .run(status, now, id);
+    } else {
+      this.db.prepare("UPDATE taam_alignment_jobs SET status = ?, error = NULL WHERE id = ?").run(status, id);
+    }
+    return this.getTaamAlignmentJob(id);
+  }
+
+  getTaamAlignmentJob(id: string): TaamAlignmentJobRecord | null {
+    const row = this.db
+      .prepare(
+        `SELECT id, witness_id, verse_range, kind, status, attempts, error, created_at, started_at, finished_at
+         FROM taam_alignment_jobs WHERE id = ?`,
+      )
+      .get(id) as
+      | {
+          id: string;
+          witness_id: string | null;
+          verse_range: string | null;
+          kind: "align" | "cascade";
+          status: "queued" | "running" | "completed" | "failed";
+          attempts: number;
+          error: string | null;
+          created_at: string;
+          started_at: string | null;
+          finished_at: string | null;
+        }
+      | undefined;
+    if (!row) return null;
+    return {
+      id: row.id,
+      witnessId: row.witness_id,
+      verseRange: row.verse_range,
+      kind: row.kind,
+      status: row.status,
+      attempts: row.attempts,
+      error: row.error ?? undefined,
+      createdAt: row.created_at,
+      startedAt: row.started_at ?? undefined,
+      finishedAt: row.finished_at ?? undefined,
+    };
+  }
+
+  listTaamAlignmentJobs(status?: "queued" | "running" | "completed" | "failed"): TaamAlignmentJobRecord[] {
+    const rows = (status
+      ? this.db
+          .prepare(
+            `SELECT id, witness_id, verse_range, kind, status, attempts, error, created_at, started_at, finished_at
+             FROM taam_alignment_jobs WHERE status = ? ORDER BY created_at DESC`,
+          )
+          .all(status)
+      : this.db
+          .prepare(
+            `SELECT id, witness_id, verse_range, kind, status, attempts, error, created_at, started_at, finished_at
+             FROM taam_alignment_jobs ORDER BY created_at DESC`,
+          )
+          .all()) as Array<{
+      id: string;
+      witness_id: string | null;
+      verse_range: string | null;
+      kind: "align" | "cascade";
+      status: "queued" | "running" | "completed" | "failed";
+      attempts: number;
+      error: string | null;
+      created_at: string;
+      started_at: string | null;
+      finished_at: string | null;
+    }>;
+    return rows.map((row) => ({
+      id: row.id,
+      witnessId: row.witness_id,
+      verseRange: row.verse_range,
+      kind: row.kind,
+      status: row.status,
+      attempts: row.attempts,
+      error: row.error ?? undefined,
+      createdAt: row.created_at,
+      startedAt: row.started_at ?? undefined,
+      finishedAt: row.finished_at ?? undefined,
+    }));
+  }
+
+  upsertWitnessTaamAlignment(input: {
+    verseId: string;
+    witnessId: string;
+    targetLayer: string;
+    targetTextHash: string;
+    taam: Array<Record<string, unknown>>;
+    metrics?: Record<string, unknown>;
+    status?: ManuscriptStatus;
+  }): TaamAlignmentRecord {
+    const now = new Date().toISOString();
+    const id = `${input.verseId}:${input.witnessId}:${input.targetLayer}:${input.targetTextHash}`;
+    this.db
+      .prepare(
+        `INSERT INTO witness_taam_alignments
+         (id, verse_id, witness_id, target_layer, target_text_hash, taam_json, metrics_json, status, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(verse_id, witness_id, target_layer, target_text_hash) DO UPDATE SET
+           taam_json = excluded.taam_json,
+           metrics_json = excluded.metrics_json,
+           status = excluded.status,
+           updated_at = excluded.updated_at`,
+      )
+      .run(
+        id,
+        input.verseId,
+        input.witnessId,
+        input.targetLayer,
+        input.targetTextHash,
+        JSON.stringify(input.taam),
+        JSON.stringify(input.metrics ?? {}),
+        input.status ?? "partial",
+        now,
+        now,
+      );
+    return this.getWitnessTaamAlignment(input.verseId, input.witnessId, input.targetLayer, input.targetTextHash) as TaamAlignmentRecord;
+  }
+
+  getWitnessTaamAlignment(verseId: string, witnessId: string, targetLayer: string, targetTextHash: string): TaamAlignmentRecord | null {
+    const row = this.db
+      .prepare(
+        `SELECT id, verse_id, witness_id, target_layer, target_text_hash, taam_json, metrics_json, status, created_at, updated_at
+         FROM witness_taam_alignments
+         WHERE verse_id = ? AND witness_id = ? AND target_layer = ? AND target_text_hash = ?`,
+      )
+      .get(verseId, witnessId, targetLayer, targetTextHash) as
+      | {
+          id: string;
+          verse_id: string;
+          witness_id: string;
+          target_layer: string;
+          target_text_hash: string;
+          taam_json: string;
+          metrics_json: string;
+          status: ManuscriptStatus;
+          created_at: string;
+          updated_at: string;
+        }
+      | undefined;
+    if (!row) return null;
+    return {
+      id: row.id,
+      verseId: row.verse_id,
+      witnessId: row.witness_id,
+      targetLayer: row.target_layer,
+      targetTextHash: row.target_text_hash,
+      taam: JSON.parse(row.taam_json),
+      metrics: JSON.parse(row.metrics_json),
+      status: row.status,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    };
+  }
+
+  listWitnessTaamAlignmentsForVerse(verseId: string, targetLayer?: string): TaamAlignmentRecord[] {
+    const rows = (targetLayer
+      ? this.db
+          .prepare(
+            `SELECT id, verse_id, witness_id, target_layer, target_text_hash, taam_json, metrics_json, status, created_at, updated_at
+             FROM witness_taam_alignments WHERE verse_id = ? AND target_layer = ? ORDER BY updated_at DESC`,
+          )
+          .all(verseId, targetLayer)
+      : this.db
+          .prepare(
+            `SELECT id, verse_id, witness_id, target_layer, target_text_hash, taam_json, metrics_json, status, created_at, updated_at
+             FROM witness_taam_alignments WHERE verse_id = ? ORDER BY updated_at DESC`,
+          )
+          .all(verseId)) as Array<{
+      id: string;
+      verse_id: string;
+      witness_id: string;
+      target_layer: string;
+      target_text_hash: string;
+      taam_json: string;
+      metrics_json: string;
+      status: ManuscriptStatus;
+      created_at: string;
+      updated_at: string;
+    }>;
+    return rows.map((row) => ({
+      id: row.id,
+      verseId: row.verse_id,
+      witnessId: row.witness_id,
+      targetLayer: row.target_layer,
+      targetTextHash: row.target_text_hash,
+      taam: JSON.parse(row.taam_json),
+      metrics: JSON.parse(row.metrics_json),
+      status: row.status,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    }));
+  }
+
+  upsertWorkingTaamConsensus(input: {
+    verseId: string;
+    targetLayer: string;
+    targetTextHash: string;
+    consensusTaam: Array<Record<string, unknown>>;
+    ensembleConfidence: number;
+    flags?: string[];
+    reasonCodes?: string[];
+  }): WorkingTaamConsensusRecord {
+    const now = new Date().toISOString();
+    this.db
+      .prepare(
+        `INSERT INTO working_taam_consensus
+         (verse_id, target_layer, target_text_hash, consensus_taam_json, ensemble_confidence, flags_json, reason_codes_json, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(verse_id) DO UPDATE SET
+           target_layer = excluded.target_layer,
+           target_text_hash = excluded.target_text_hash,
+           consensus_taam_json = excluded.consensus_taam_json,
+           ensemble_confidence = excluded.ensemble_confidence,
+           flags_json = excluded.flags_json,
+           reason_codes_json = excluded.reason_codes_json,
+           updated_at = excluded.updated_at`,
+      )
+      .run(
+        input.verseId,
+        input.targetLayer,
+        input.targetTextHash,
+        JSON.stringify(input.consensusTaam),
+        input.ensembleConfidence,
+        JSON.stringify(input.flags ?? []),
+        JSON.stringify(input.reasonCodes ?? []),
+        now,
+        now,
+      );
+    return this.getWorkingTaamConsensus(input.verseId) as WorkingTaamConsensusRecord;
+  }
+
+  getWorkingTaamConsensus(verseId: string): WorkingTaamConsensusRecord | null {
+    const row = this.db
+      .prepare(
+        `SELECT verse_id, target_layer, target_text_hash, consensus_taam_json, ensemble_confidence, flags_json, reason_codes_json, created_at, updated_at
+         FROM working_taam_consensus WHERE verse_id = ?`,
+      )
+      .get(verseId) as
+      | {
+          verse_id: string;
+          target_layer: string;
+          target_text_hash: string;
+          consensus_taam_json: string;
+          ensemble_confidence: number;
+          flags_json: string;
+          reason_codes_json: string;
+          created_at: string;
+          updated_at: string;
+        }
+      | undefined;
+    if (!row) return null;
+    return {
+      verseId: row.verse_id,
+      targetLayer: row.target_layer,
+      targetTextHash: row.target_text_hash,
+      consensusTaam: JSON.parse(row.consensus_taam_json),
+      ensembleConfidence: row.ensemble_confidence,
+      flags: JSON.parse(row.flags_json),
+      reasonCodes: JSON.parse(row.reason_codes_json),
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    };
+  }
+
   listBaseTextPatches(verseId: string): BaseTextPatchRecord[] {
     const rows = this.db
       .prepare(
@@ -1419,7 +1860,7 @@ export class TargumRepository {
   listRegionsByPage(pageId: string): PageRegionRecord[] {
     const rows = this.db
       .prepare(
-        `SELECT id, page_id, region_index, bbox_json, start_verse_id, end_verse_id, status, notes, created_at, updated_at
+        `SELECT id, page_id, region_index, bbox_json, start_verse_id, end_verse_id, remap_method, remap_confidence, remap_candidates_json, remap_review_required, status, notes, created_at, updated_at
          FROM page_regions WHERE page_id = ? ORDER BY region_index ASC, created_at ASC`,
       )
       .all(pageId) as Array<{
@@ -1429,6 +1870,10 @@ export class TargumRepository {
       bbox_json: string;
       start_verse_id: string | null;
       end_verse_id: string | null;
+      remap_method: string | null;
+      remap_confidence: number | null;
+      remap_candidates_json: string;
+      remap_review_required: number;
       status: ManuscriptStatus;
       notes: string;
       created_at: string;
@@ -1441,6 +1886,53 @@ export class TargumRepository {
       bbox: JSON.parse(row.bbox_json),
       startVerseId: row.start_verse_id,
       endVerseId: row.end_verse_id,
+      remapMethod: row.remap_method,
+      remapConfidence: row.remap_confidence,
+      remapCandidates: JSON.parse(row.remap_candidates_json ?? "[]"),
+      remapReviewRequired: Boolean(row.remap_review_required),
+      status: row.status,
+      notes: row.notes,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    }));
+  }
+
+  listRegionsByWitness(witnessId: string): PageRegionRecord[] {
+    const rows = this.db
+      .prepare(
+        `SELECT r.id, r.page_id, r.region_index, r.bbox_json, r.start_verse_id, r.end_verse_id, r.remap_method, r.remap_confidence, r.remap_candidates_json, r.remap_review_required, r.status, r.notes, r.created_at, r.updated_at
+         FROM page_regions r
+         JOIN pages p ON p.id = r.page_id
+         WHERE p.witness_id = ?
+         ORDER BY p.page_index ASC, r.region_index ASC`,
+      )
+      .all(witnessId) as Array<{
+      id: string;
+      page_id: string;
+      region_index: number;
+      bbox_json: string;
+      start_verse_id: string | null;
+      end_verse_id: string | null;
+      remap_method: string | null;
+      remap_confidence: number | null;
+      remap_candidates_json: string;
+      remap_review_required: number;
+      status: ManuscriptStatus;
+      notes: string;
+      created_at: string;
+      updated_at: string;
+    }>;
+    return rows.map((row) => ({
+      id: row.id,
+      pageId: row.page_id,
+      regionIndex: row.region_index,
+      bbox: JSON.parse(row.bbox_json),
+      startVerseId: row.start_verse_id,
+      endVerseId: row.end_verse_id,
+      remapMethod: row.remap_method,
+      remapConfidence: row.remap_confidence,
+      remapCandidates: JSON.parse(row.remap_candidates_json ?? "[]"),
+      remapReviewRequired: Boolean(row.remap_review_required),
       status: row.status,
       notes: row.notes,
       createdAt: row.created_at,
@@ -1500,6 +1992,10 @@ export class TargumRepository {
            COALESCE(rs.ocr_status, 'pending') AS ocr_status,
            COALESCE(rs.split_status, 'pending') AS split_status,
            COALESCE(rs.confidence_status, 'pending') AS confidence_status,
+           COALESCE(rs.rss_mb, 0) AS rss_mb,
+           COALESCE(rs.cpu_pct, 0) AS cpu_pct,
+           COALESCE(rs.queue_depth, 0) AS queue_depth,
+           COALESCE(rs.throttle_state, 'normal') AS throttle_state,
            COALESCE(rs.updated_at, w.updated_at) AS run_state_updated_at,
            (SELECT COUNT(*) FROM pages p WHERE p.witness_id = w.id) AS pages_imported,
            (SELECT COALESCE(MAX(p.page_index), 0) FROM pages p WHERE p.witness_id = w.id) AS max_page_index,
@@ -1568,6 +2064,10 @@ export class TargumRepository {
       ocr_status: RunStageStatus;
       split_status: RunStageStatus;
       confidence_status: RunStageStatus;
+      rss_mb: number;
+      cpu_pct: number;
+      queue_depth: number;
+      throttle_state: "normal" | "reduced" | "single";
       run_state_updated_at: string;
       pages_imported: number;
       max_page_index: number;
@@ -1598,6 +2098,10 @@ export class TargumRepository {
       ocrStatus: row.ocr_status,
       splitStatus: row.split_status,
       confidenceStatus: row.confidence_status,
+      rssMb: row.rss_mb,
+      cpuPct: row.cpu_pct,
+      queueDepth: row.queue_depth,
+      throttleState: row.throttle_state,
       runStateUpdatedAt: row.run_state_updated_at,
       pagesImported: row.pages_imported,
       maxPageIndex: row.max_page_index,
@@ -1622,7 +2126,7 @@ export class TargumRepository {
   getWitnessRunState(witnessId: string): WitnessRunStateRecord {
     const row = this.db
       .prepare(
-        `SELECT witness_id, ingest_status, ocr_status, split_status, confidence_status, blockers_json, updated_at
+        `SELECT witness_id, ingest_status, ocr_status, split_status, confidence_status, blockers_json, rss_mb, cpu_pct, queue_depth, throttle_state, updated_at
          FROM manuscript_run_state WHERE witness_id = ?`,
       )
       .get(witnessId) as
@@ -1633,6 +2137,10 @@ export class TargumRepository {
           split_status: RunStageStatus;
           confidence_status: RunStageStatus;
           blockers_json: string;
+          rss_mb: number;
+          cpu_pct: number;
+          queue_depth: number;
+          throttle_state: "normal" | "reduced" | "single";
           updated_at: string;
         }
       | undefined;
@@ -1642,8 +2150,8 @@ export class TargumRepository {
       this.db
         .prepare(
           `INSERT INTO manuscript_run_state
-           (witness_id, ingest_status, ocr_status, split_status, confidence_status, blockers_json, updated_at)
-           VALUES (?, 'pending', 'pending', 'pending', 'pending', '[]', ?)`,
+           (witness_id, ingest_status, ocr_status, split_status, confidence_status, blockers_json, rss_mb, cpu_pct, queue_depth, throttle_state, updated_at)
+           VALUES (?, 'pending', 'pending', 'pending', 'pending', '[]', 0, 0, 0, 'normal', ?)`,
         )
         .run(witnessId, now);
       return {
@@ -1653,6 +2161,10 @@ export class TargumRepository {
         splitStatus: "pending",
         confidenceStatus: "pending",
         blockers: [],
+        rssMb: 0,
+        cpuPct: 0,
+        queueDepth: 0,
+        throttleState: "normal",
         updatedAt: now,
       };
     }
@@ -1664,6 +2176,10 @@ export class TargumRepository {
       splitStatus: row.split_status,
       confidenceStatus: row.confidence_status,
       blockers: JSON.parse(row.blockers_json),
+      rssMb: row.rss_mb,
+      cpuPct: row.cpu_pct,
+      queueDepth: row.queue_depth,
+      throttleState: row.throttle_state,
       updatedAt: row.updated_at,
     };
   }
@@ -1676,6 +2192,7 @@ export class TargumRepository {
     actor?: string;
     note?: string;
     overrideUsed?: boolean;
+    telemetry?: { rssMb?: number; cpuPct?: number; queueDepth?: number; throttleState?: "normal" | "reduced" | "single" };
   }): WitnessRunStateRecord {
     const now = new Date().toISOString();
     const blockers = input.blockers ?? [];
@@ -1694,14 +2211,18 @@ export class TargumRepository {
     this.db
       .prepare(
         `INSERT INTO manuscript_run_state
-         (witness_id, ingest_status, ocr_status, split_status, confidence_status, blockers_json, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)
+         (witness_id, ingest_status, ocr_status, split_status, confidence_status, blockers_json, rss_mb, cpu_pct, queue_depth, throttle_state, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(witness_id) DO UPDATE SET
            ingest_status = excluded.ingest_status,
            ocr_status = excluded.ocr_status,
            split_status = excluded.split_status,
            confidence_status = excluded.confidence_status,
            blockers_json = excluded.blockers_json,
+           rss_mb = excluded.rss_mb,
+           cpu_pct = excluded.cpu_pct,
+           queue_depth = excluded.queue_depth,
+           throttle_state = excluded.throttle_state,
            updated_at = excluded.updated_at`,
       )
       .run(
@@ -1711,6 +2232,10 @@ export class TargumRepository {
         next.splitStatus,
         next.confidenceStatus,
         JSON.stringify(blockers),
+        input.telemetry?.rssMb ?? current.rssMb ?? 0,
+        input.telemetry?.cpuPct ?? current.cpuPct ?? 0,
+        input.telemetry?.queueDepth ?? current.queueDepth ?? 0,
+        input.telemetry?.throttleState ?? current.throttleState ?? "normal",
         now,
       );
 

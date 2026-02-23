@@ -124,3 +124,13 @@ Status date: 2026-02-20
 
 ## Open Items (Remaining)
 - [x] Run and document the initial real 10-20 page calibration pass with actual manuscript assets (implemented from local `/book_sources` PDFs).
+
+## TODO 10: Snippet Remap + Ta'am Alignment + Monitoring
+- [x] Add OCR snippet-based region remap API with conservative auto-assign + review fallback
+- [x] Add remap metadata persistence on regions (`method`, `confidence`, `candidates`, `review_required`)
+- [x] Add split/confidence/cascade backfill helper for remapped regions
+- [x] Add witness ta'am alignment persistence + consensus persistence tables
+- [x] Add ta'am alignment/cascade/apply APIs
+- [x] Add manuscripts monitoring APIs (`summary`, `jobs`, `system`)
+- [x] Add `/manuscripts/monitoring` page with auto-refresh controls and alert cards
+- [x] Add M1 Mac Mini (8GB) runtime tuning defaults (batch size and throttling telemetry)

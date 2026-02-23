@@ -2,6 +2,14 @@ import type { RunBlocker, RunStage, WitnessRecord } from "@targum/storage";
 import type { TargumRepository } from "@targum/storage";
 import { getRepository } from "./repository";
 
+function telemetrySnapshot(queueDepth = 0): { rssMb: number; cpuPct: number; queueDepth: number; throttleState: "normal" | "reduced" | "single" } {
+  const rssMb = process.memoryUsage().rss / (1024 * 1024);
+  const cpu = process.cpuUsage();
+  const cpuPct = Math.min(100, Math.max(0, (cpu.user + cpu.system) / 10000));
+  const throttleState: "normal" | "reduced" | "single" = rssMb > 7000 ? "single" : rssMb > 6200 ? "reduced" : "normal";
+  return { rssMb, cpuPct, queueDepth, throttleState };
+}
+
 export interface GateEvaluation {
   allowed: boolean;
   blockers: RunBlocker[];
@@ -67,6 +75,7 @@ export function evaluateSourceGate(input: {
       actor: input.actor,
       note: input.note ?? "blocked by priority gate",
       overrideUsed: false,
+      telemetry: telemetrySnapshot(),
     });
     return { allowed: false, blockers, witness, stage: input.stage, overrideUsed: false };
   }
@@ -79,6 +88,7 @@ export function evaluateSourceGate(input: {
     actor: input.actor,
     note: blockers.length > 0 ? "admin override used" : input.note,
     overrideUsed: Boolean(blockers.length > 0 && input.adminOverride),
+    telemetry: telemetrySnapshot(),
   });
 
   return {
@@ -99,6 +109,7 @@ export function markStageCompleted(witnessId: string, stage: RunStage, actor?: s
     blockers: [],
     actor,
     note,
+    telemetry: telemetrySnapshot(),
   });
 }
 
@@ -111,6 +122,7 @@ export function markStageFailed(witnessId: string, stage: RunStage, error: strin
     blockers: [],
     actor,
     note: error,
+    telemetry: telemetrySnapshot(),
   });
 }
 
