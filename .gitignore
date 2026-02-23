@@ -11,6 +11,7 @@ packages/*/dist/
 *.tsbuildinfo
 
 # Local data
+/data
 /data/app.db
 /data/exports/
 /data/verses/
@@ -18,17 +19,12 @@ packages/*/dist/
 
 # Scraped / generated import artifacts (reproducible via scrape scripts)
 /data/imports/html_cache/
-/data/imports/manuscripts/
+/data/imports/manuscripts/**
 /data/imports/*.tsv
 /data/imports/full_torah_checkpoint.json
 /data/imports/torah_scrape_manifest.json
-/docs/import-runs/
+/docs/import-runs/**
 /book_sources/
-/data/imports/manuscripts/crops/
-/data/imports/manuscripts/*/raw-pages/
-/data/imports/manuscripts/*/thumbnails/
-/data/imports/manuscripts/*/runs/
-/docs/import-runs/
 
 # Environment
 .env
