@@ -33,7 +33,7 @@
   - `decision=<Verified|Keep baseline|Accept witness>;reason=<short reason>;page=<index>;region=<id>`
 
 ## 4) Scale-Up Batch + Failure Handling
-- Batch size: 100 pages per witness per run.
+- Batch size: 50 pages per witness per run on the dedicated M1 Mac Mini (8GB RAM).
 - Stop batch if either condition is met:
   - OCR job failure rate > 15%
   - split partial-rate > 30%
@@ -54,3 +54,12 @@
 - Blockers:
   - unresolved priority gate blockers
   - unresolved data quality blockers
+
+## 6) Monitoring Page
+- Use `/manuscripts/monitoring` for live operations oversight.
+- Refresh cadence: 10s (pause/resume available in UI).
+- Track:
+  - per-witness stage status
+  - queue health (`low_confidence`, `disagreement`, `unavailable_partial`, remap ambiguous)
+  - OCR and ta'am alignment job states
+  - system telemetry (`rss_mb`, `cpu_pct`, `queue_depth`, `throttle_state`)

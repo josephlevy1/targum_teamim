@@ -75,7 +75,7 @@ export function parseImportArgs(argv: string[]): ManuscriptImportArgs {
   }
 
   const startPage = Math.max(1, Number(get("--start-page") ?? 1));
-  const pageCountDefault = mode === "calibration" ? 20 : 100;
+  const pageCountDefault = mode === "calibration" ? 20 : 50;
   const pageCount = Math.max(1, Number(get("--page-count") ?? pageCountDefault));
 
   return {
