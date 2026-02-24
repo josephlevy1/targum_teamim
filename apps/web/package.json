@@ -19,6 +19,7 @@
     "manuscripts:bootstrap": "tsx scripts/bootstrap-manuscript-witnesses.ts",
     "manuscripts:fetch-vaticana": "tsx scripts/fetch-vaticana-pages.ts",
     "manuscripts:import-run": "tsx scripts/run-manuscript-import.ts",
+    "manuscripts:expand-alignment": "tsx scripts/expand-full-alignment.ts",
     "manuscripts:overnight": "tsx scripts/run-overnight-alignment.ts",
     "manuscripts:status": "tsx scripts/manuscripts-status.ts",
     "manuscripts:ocr-workers": "tsx scripts/run-ocr-workers.ts"
