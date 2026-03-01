@@ -124,44 +124,129 @@ export async function runRegionOcr(regionId: string): Promise<{
   }
 }
 
+type DiffOp = { op: "equal" | "replace" | "insert" | "delete"; a?: string; b?: string };
+
+type CharDiffDetail = {
+  a: string;
+  b: string;
+  charEditDistance: number;
+  charMatchScore: number;
+  charOps: DiffOp[];
+};
+
 type Alignment = {
   editDistance: number;
   matchScore: number;
-  tokenDiffOps: Array<{ op: "equal" | "replace" | "insert" | "delete"; a?: string; b?: string }>;
+  tokenDiffOps: DiffOp[];
+  tokenStats: {
+    matches: number;
+    replacements: number;
+    inserts: number;
+    deletes: number;
+    alignedTokenCount: number;
+  };
+  charStats: {
+    charEditDistance: number;
+    charMatchScore: number;
+  };
+  replaceDetails: Record<number, CharDiffDetail>;
 };
 
-export function alignWitnessToBaseline(witnessText: string, baselineText: string): Alignment {
-  const a = normalizeComparisonText(witnessText);
-  const b = normalizeComparisonText(baselineText);
-  const m = a.length;
-  const n = b.length;
+function alignSequence<T>(left: T[], right: T[], equal: (a: T, b: T) => boolean): { ops: DiffOp[]; editDistance: number } {
+  const m = left.length;
+  const n = right.length;
   const dp: number[][] = Array.from({ length: m + 1 }, (_, i) =>
     Array.from({ length: n + 1 }, (_, j) => (i === 0 ? j : j === 0 ? i : 0)),
   );
   for (let i = 1; i <= m; i += 1) {
     for (let j = 1; j <= n; j += 1) {
-      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      const cost = equal(left[i - 1], right[j - 1]) ? 0 : 1;
       dp[i][j] = Math.min(dp[i - 1][j] + 1, dp[i][j - 1] + 1, dp[i - 1][j - 1] + cost);
     }
   }
-  const editDistance = dp[m][n];
-  const maxLen = Math.max(m, n, 1);
-  const matchScore = Math.max(0, 1 - editDistance / maxLen);
 
+  const ops: DiffOp[] = [];
+  let i = m;
+  let j = n;
+  while (i > 0 || j > 0) {
+    if (i > 0 && j > 0) {
+      const cost = equal(left[i - 1], right[j - 1]) ? 0 : 1;
+      if (dp[i][j] === dp[i - 1][j - 1] + cost) {
+        const aVal = String(left[i - 1]);
+        const bVal = String(right[j - 1]);
+        ops.push(cost === 0 ? { op: "equal", a: aVal, b: bVal } : { op: "replace", a: aVal, b: bVal });
+        i -= 1;
+        j -= 1;
+        continue;
+      }
+    }
+    if (i > 0 && dp[i][j] === dp[i - 1][j] + 1) {
+      ops.push({ op: "delete", a: String(left[i - 1]) });
+      i -= 1;
+      continue;
+    }
+    ops.push({ op: "insert", b: String(right[j - 1]) });
+    j -= 1;
+  }
+  ops.reverse();
+  return { ops, editDistance: dp[m][n] };
+}
+
+function buildCharDiffDetail(a: string, b: string): CharDiffDetail {
+  const aChars = Array.from(a);
+  const bChars = Array.from(b);
+  const aligned = alignSequence(aChars, bChars, (left, right) => left === right);
+  const maxLen = Math.max(aChars.length, bChars.length, 1);
+  return {
+    a,
+    b,
+    charEditDistance: aligned.editDistance,
+    charMatchScore: Math.max(0, 1 - aligned.editDistance / maxLen),
+    charOps: aligned.ops,
+  };
+}
+
+export function alignWitnessToBaseline(witnessText: string, baselineText: string): Alignment {
+  const a = normalizeComparisonText(witnessText);
+  const b = normalizeComparisonText(baselineText);
   const aTokens = a ? a.split(" ") : [];
   const bTokens = b ? b.split(" ") : [];
-  const maxTokens = Math.max(aTokens.length, bTokens.length);
-  const tokenDiffOps: Alignment["tokenDiffOps"] = [];
-  for (let i = 0; i < maxTokens; i += 1) {
-    const av = aTokens[i];
-    const bv = bTokens[i];
-    if (av === undefined) tokenDiffOps.push({ op: "insert", b: bv });
-    else if (bv === undefined) tokenDiffOps.push({ op: "delete", a: av });
-    else if (av === bv) tokenDiffOps.push({ op: "equal", a: av, b: bv });
-    else tokenDiffOps.push({ op: "replace", a: av, b: bv });
-  }
+  const tokenAligned = alignSequence(aTokens, bTokens, (left, right) => left === right);
+  const tokenDiffOps = tokenAligned.ops;
+  const maxTokens = Math.max(aTokens.length, bTokens.length, 1);
+  const matchScore = Math.max(0, 1 - tokenAligned.editDistance / maxTokens);
 
-  return { editDistance, matchScore, tokenDiffOps };
+  const tokenStats = tokenDiffOps.reduce(
+    (acc, op) => {
+      if (op.op === "equal") acc.matches += 1;
+      if (op.op === "replace") acc.replacements += 1;
+      if (op.op === "insert") acc.inserts += 1;
+      if (op.op === "delete") acc.deletes += 1;
+      return acc;
+    },
+    { matches: 0, replacements: 0, inserts: 0, deletes: 0, alignedTokenCount: tokenDiffOps.length },
+  );
+
+  const replaceDetails: Record<number, CharDiffDetail> = {};
+  tokenDiffOps.forEach((op, index) => {
+    if (op.op !== "replace") return;
+    replaceDetails[index] = buildCharDiffDetail(op.a ?? "", op.b ?? "");
+  });
+
+  const charAligned = alignSequence(Array.from(a), Array.from(b), (left, right) => left === right);
+  const charMaxLen = Math.max(a.length, b.length, 1);
+
+  return {
+    editDistance: tokenAligned.editDistance,
+    matchScore,
+    tokenDiffOps,
+    tokenStats,
+    charStats: {
+      charEditDistance: charAligned.editDistance,
+      charMatchScore: Math.max(0, 1 - charAligned.editDistance / charMaxLen),
+    },
+    replaceDetails,
+  };
 }
 
 function splitRegionTextByBaseline(regionText: string, baselines: string[]): { slices: string[]; partial: boolean; reason?: string } {
@@ -236,6 +321,9 @@ export async function splitRegionIntoWitnessVerses(regionId: string): Promise<{
         regionId,
         editDistance: alignment.editDistance,
         tokenDiffOps: alignment.tokenDiffOps,
+        tokenStats: alignment.tokenStats,
+        charStats: alignment.charStats,
+        replaceDetails: alignment.replaceDetails,
         splitReason: split.reason ?? null,
       },
     });
@@ -279,49 +367,46 @@ export function recomputeSourceConfidence(verseId: string): { verseId: string; w
   return { verseId, witnessCount: rows.length };
 }
 
-export function recomputeCascadeForVerse(verseId: string, thresholds = { vatican: 0.7, hebrewbooks: 0.65 }) {
+export function recomputeCascadeForVerse(verseId: string, thresholds = { selection: 0.65, disagreement: 0.8 }) {
   const repo = getRepository();
-  const candidates = repo.listWitnessVersesForVerse(verseId);
+  const candidates = repo
+    .listWitnessVersesForVerse(verseId)
+    .slice()
+    .sort((a, b) => {
+      if (b.sourceConfidence !== a.sourceConfidence) return b.sourceConfidence - a.sourceConfidence;
+      return b.matchScore - a.matchScore;
+    });
   const byWitnessId = new Map(candidates.map((row) => [row.witnessId, row]));
-  const vatican = candidates
-    .filter((row) => row.witnessId.startsWith("vatican_"))
-    .sort((a, b) => b.sourceConfidence - a.sourceConfidence)[0];
-  const hebrewBooks = candidates
-    .filter((row) => row.witnessId.startsWith("hebrewbooks_"))
-    .sort((a, b) => b.sourceConfidence - a.sourceConfidence)[0];
+  const top = candidates[0];
+  const second = candidates[1];
   const baselineText = renderAramaicFromVerseId(verseId);
   const reasonCodes: string[] = [];
   let selectedSource = "baseline_digital";
   let selectedText = baselineText;
   let ensembleConfidence = 0.45;
 
-  if (vatican && vatican.sourceConfidence >= thresholds.vatican) {
-    selectedSource = vatican.witnessId;
-    selectedText = vatican.textNormalized || vatican.textRaw;
-    ensembleConfidence = vatican.sourceConfidence;
-  } else if (hebrewBooks && hebrewBooks.sourceConfidence >= thresholds.hebrewbooks) {
-    selectedSource = hebrewBooks.witnessId;
-    selectedText = hebrewBooks.textNormalized || hebrewBooks.textRaw;
-    ensembleConfidence = hebrewBooks.sourceConfidence;
-    reasonCodes.push("VATICAN_LOW_CLARITY");
+  if (!top) {
+    reasonCodes.push("NO_WITNESS_AVAILABLE");
+  } else if (top.sourceConfidence >= thresholds.selection) {
+    selectedSource = top.witnessId;
+    selectedText = top.textNormalized || top.textRaw;
+    ensembleConfidence = top.sourceConfidence;
+    reasonCodes.push("TOP_WITNESS_SELECTED");
   } else {
-    reasonCodes.push("SCAN_WITNESSES_BELOW_THRESHOLD");
+    reasonCodes.push("TOP_WITNESS_BELOW_THRESHOLD");
   }
 
   const flags: string[] = [];
-  if (vatican && hebrewBooks && vatican.sourceConfidence >= thresholds.vatican && hebrewBooks.sourceConfidence >= thresholds.hebrewbooks) {
-    const disagreement = alignWitnessToBaseline(vatican.textNormalized, hebrewBooks.textNormalized).matchScore < 0.8;
+  if (top && second && top.sourceConfidence >= thresholds.selection && second.sourceConfidence >= thresholds.selection) {
+    const disagreement =
+      alignWitnessToBaseline(top.textNormalized || top.textRaw, second.textNormalized || second.textRaw).charStats.charMatchScore <
+      thresholds.disagreement;
     if (disagreement) {
       flags.push("DISAGREEMENT_FLAG");
       reasonCodes.push("HIGH_CONFIDENCE_DISAGREEMENT");
       ensembleConfidence = Math.min(ensembleConfidence, 0.7);
-    } else {
-      ensembleConfidence = Math.min(1, ensembleConfidence + 0.08);
     }
   }
-
-  if (!vatican) reasonCodes.push("VATICAN_UNAVAILABLE");
-  if (!hebrewBooks) reasonCodes.push("HEBREWBOOKS_UNAVAILABLE");
 
   const stored = repo.upsertWorkingVerseText({
     verseId,

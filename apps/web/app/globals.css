@@ -1250,3 +1250,136 @@ hr {
     margin-top: 0.4rem;
   }
 }
+
+.witness-diff-char-detail {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.2rem;
+  margin-left: 0.35rem;
+}
+
+.witness-diff-char-chip {
+  border: 1px solid #d1d5db;
+  border-radius: 999px;
+  padding: 0.05rem 0.35rem;
+  font-size: 0.72rem;
+  color: #111827;
+  background: #f9fafb;
+}
+
+.witness-diff-char-insert {
+  border-color: #86efac;
+  background: #dcfce7;
+  color: #166534;
+}
+
+.witness-diff-char-delete {
+  border-color: #fca5a5;
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.witness-diff-char-replace {
+  border-color: #fdba74;
+  background: #ffedd5;
+  color: #9a3412;
+}
+
+.manuscript-review-context {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.manuscript-summary-strip {
+  border: 1px solid #d1fae5;
+  background: #ecfdf5;
+  border-radius: 0.5rem;
+  padding: 0.45rem 0.6rem;
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.manuscript-text-compare-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+
+.manuscript-text-label {
+  font-weight: 700;
+  margin-bottom: 0.2rem;
+}
+
+.manuscript-text-block {
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  background: #f9fafb;
+  padding: 0.45rem 0.55rem;
+  line-height: 1.65;
+}
+
+.manuscript-witness-card {
+  margin-bottom: 0.75rem;
+}
+
+.manuscript-witness-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.35rem;
+}
+
+.manuscript-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.1rem 0.45rem;
+  border: 1px solid #d1d5db;
+}
+
+.manuscript-badge-selected {
+  border-color: #93c5fd;
+  background: #dbeafe;
+  color: #1e3a8a;
+}
+
+.manuscript-badge-status {
+  background: #f3f4f6;
+}
+
+.manuscript-status-ok {
+  border-color: #86efac;
+  background: #dcfce7;
+  color: #14532d;
+}
+
+.manuscript-status-partial {
+  border-color: #fcd34d;
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.manuscript-status-unavailable {
+  border-color: #fca5a5;
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.manuscript-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.25rem 0.5rem;
+  margin-bottom: 0.4rem;
+}
+
+@media (max-width: 900px) {
+  .manuscript-text-compare-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .manuscript-metrics-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
