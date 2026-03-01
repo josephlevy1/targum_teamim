@@ -1383,3 +1383,69 @@ hr {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+.source-baseline-text {
+  margin-top: 0.35rem;
+  padding: 0.35rem 0.45rem;
+  border: 1px solid #d6d3cc;
+  border-radius: 8px;
+  background: #f7f5f0;
+  line-height: 1.5;
+}
+
+.source-card {
+  margin-top: 0.55rem;
+  border: 1px solid #d8d1c6;
+  border-radius: 10px;
+  padding: 0.35rem 0.45rem;
+  background: #fffdf9;
+}
+
+.source-card-summary {
+  cursor: pointer;
+  display: flex;
+  gap: 0.3rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.source-status {
+  border: 1px solid #ccc;
+  border-radius: 999px;
+  padding: 0.05rem 0.35rem;
+  font-size: 0.72rem;
+}
+
+.source-status-ok {
+  border-color: #86efac;
+  background: #dcfce7;
+  color: #14532d;
+}
+
+.source-status-partial {
+  border-color: #fcd34d;
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.source-status-unavailable,
+.source-status-failed {
+  border-color: #fca5a5;
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.source-scan-wrap {
+  margin-top: 0.4rem;
+  display: grid;
+  gap: 0.3rem;
+}
+
+.source-scan-image {
+  width: 100%;
+  max-height: 180px;
+  object-fit: contain;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: #fff;
+}
