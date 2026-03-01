@@ -50,17 +50,18 @@ type SourceWitness = {
   status: string;
   textNormalized: string;
   artifacts: {
+    regionId?: string;
     tokenDiffOps?: Array<{ op: "equal" | "replace" | "insert" | "delete"; a?: string; b?: string }>;
     replaceDetails?: Record<number, ReplaceDetail>;
   };
-  scan: {
-    regionId: string;
-    pageId: string;
-    pageIndex: number;
-    cropUrl: string;
-    thumbnailUrl: string;
-    pageUrl: string;
-  } | null;
+};
+
+type WitnessMeta = {
+  id: string;
+  name: string;
+  sourcePriority: number | null;
+  sourceLink: string | null;
+  sourceFileName: string | null;
 };
 
 type SourcePayload = {
@@ -221,6 +222,7 @@ function HomePageInner() {
   const [exportOpen, setExportOpen] = useState(modeParam === "export");
   const [exportActiveAction, setExportActiveAction] = useState<"verse" | "chapter" | "book" | "all" | null>(null);
   const [sourcePayload, setSourcePayload] = useState<SourcePayload | null>(null);
+  const [witnessMeta, setWitnessMeta] = useState<Record<string, WitnessMeta>>({});
 
   const selectedTaam = useMemo(() => record?.edited.find((t) => t.taamId === selectedTaamId) ?? null, [record, selectedTaamId]);
   const queryVerseId = searchParams.get("verseId")?.trim() ?? "";
@@ -622,9 +624,17 @@ function HomePageInner() {
   }
 
   async function loadSources(id: string) {
-    const res = await fetch(`/api/manuscripts/verse/${encodeURIComponent(id)}/sources`);
-    if (!res.ok) return;
-    const json = (await res.json()) as SourcePayload;
+    const [sourcesRes, witnessRes] = await Promise.all([
+      fetch(`/api/manuscripts/verse/${encodeURIComponent(id)}/witnesses`),
+      fetch("/api/manuscripts/witnesses"),
+    ]);
+    if (!sourcesRes.ok) return;
+    const json = (await sourcesRes.json()) as SourcePayload;
+    if (witnessRes.ok) {
+      const witnessPayload = (await witnessRes.json()) as { witnesses?: WitnessMeta[] };
+      const map = Object.fromEntries((witnessPayload.witnesses ?? []).map((row) => [row.id, row]));
+      setWitnessMeta(map);
+    }
     setSourcePayload(json);
   }
 
@@ -1330,16 +1340,18 @@ function HomePageInner() {
                   <strong>{row.witnessId}</strong> conf {(row.sourceConfidence * 100).toFixed(0)}% match {(row.matchScore * 100).toFixed(0)}%{" "}
                   <span className={`source-status source-status-${row.status}`}>{row.status}</span>
                 </summary>
+                <div className="small">
+                  {witnessMeta[row.witnessId]?.name ?? row.witnessId}
+                  {witnessMeta[row.witnessId]?.sourcePriority ? ` (P${witnessMeta[row.witnessId]?.sourcePriority})` : ""}
+                </div>
+                {witnessMeta[row.witnessId]?.sourceLink ? (
+                  <a href={witnessMeta[row.witnessId]?.sourceLink ?? "#"} target="_blank" rel="noreferrer" className="small">
+                    Open scanned source link
+                  </a>
+                ) : null}
                 <div className="small" dir="rtl">{row.textNormalized}</div>
                 <WitnessDiff ops={row.artifacts?.tokenDiffOps ?? []} replaceDetails={row.artifacts?.replaceDetails} />
-                {row.scan ? (
-                  <div className="source-scan-wrap">
-                    <a href={row.scan.pageUrl} target="_blank" rel="noreferrer" className="small">Open full page scan (p.{row.scan.pageIndex})</a>
-                    <img src={row.scan.cropUrl} alt={`${row.witnessId} crop`} className="source-scan-image" loading="lazy" />
-                  </div>
-                ) : (
-                  <div className="small">No scanned artifact linked for this witness verse yet.</div>
-                )}
+                <div className="small">{row.artifacts?.regionId ? `Region: ${row.artifacts.regionId}` : "No scanned region linked yet."}</div>
               </details>
             ))}
           </section>
