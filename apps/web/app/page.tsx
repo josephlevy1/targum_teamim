@@ -1209,6 +1209,37 @@ function HomePageInner() {
             Next verse <span className="kbd-hint">N</span>
           </button>
         </div>
+
+        <section className="center-sources">
+          <div className="right-section-label">Sources</div>
+          <h3 className="section-title">Witness Sources</h3>
+          <div className="small">
+            Working source: {sourcePayload?.working?.selectedSource ?? "baseline_digital"} ({(sourcePayload?.working?.ensembleConfidence ?? 0).toFixed(2)})
+          </div>
+          <div className="small source-baseline-text" dir="rtl">
+            Baseline: {sourcePayload?.baseline?.textSurface ?? ""}
+          </div>
+          {(sourcePayload?.witnesses ?? []).map((row) => (
+            <details key={`source-${row.witnessId}`} className="source-card">
+              <summary className="small source-card-summary">
+                <strong>{row.witnessId}</strong> conf {(row.sourceConfidence * 100).toFixed(0)}% match {(row.matchScore * 100).toFixed(0)}%{" "}
+                <span className={`source-status source-status-${row.status}`}>{row.status}</span>
+              </summary>
+              <div className="small">
+                {witnessMeta[row.witnessId]?.name ?? row.witnessId}
+                {witnessMeta[row.witnessId]?.sourcePriority ? ` (P${witnessMeta[row.witnessId]?.sourcePriority})` : ""}
+              </div>
+              {witnessMeta[row.witnessId]?.sourceLink ? (
+                <a href={witnessMeta[row.witnessId]?.sourceLink ?? "#"} target="_blank" rel="noreferrer" className="small">
+                  Open scanned source link
+                </a>
+              ) : null}
+              <div className="small" dir="rtl">{row.textNormalized}</div>
+              <WitnessDiff ops={row.artifacts?.tokenDiffOps ?? []} replaceDetails={row.artifacts?.replaceDetails} />
+              <div className="small">{row.artifacts?.regionId ? `Region: ${row.artifacts.regionId}` : "No scanned region linked yet."}</div>
+            </details>
+          ))}
+        </section>
       </section>
 
       <section className="panel right-panel">
@@ -1325,36 +1356,6 @@ function HomePageInner() {
             </details>
           </section>
 
-          <section className="right-section">
-            <div className="right-section-label">Sources</div>
-            <h3 className="section-title">Witness Sources</h3>
-            <div className="small">
-              Working source: {sourcePayload?.working?.selectedSource ?? "baseline_digital"} ({(sourcePayload?.working?.ensembleConfidence ?? 0).toFixed(2)})
-            </div>
-            <div className="small source-baseline-text" dir="rtl">
-              Baseline: {sourcePayload?.baseline?.textSurface ?? ""}
-            </div>
-            {(sourcePayload?.witnesses ?? []).map((row) => (
-              <details key={`source-${row.witnessId}`} className="source-card">
-                <summary className="small source-card-summary">
-                  <strong>{row.witnessId}</strong> conf {(row.sourceConfidence * 100).toFixed(0)}% match {(row.matchScore * 100).toFixed(0)}%{" "}
-                  <span className={`source-status source-status-${row.status}`}>{row.status}</span>
-                </summary>
-                <div className="small">
-                  {witnessMeta[row.witnessId]?.name ?? row.witnessId}
-                  {witnessMeta[row.witnessId]?.sourcePriority ? ` (P${witnessMeta[row.witnessId]?.sourcePriority})` : ""}
-                </div>
-                {witnessMeta[row.witnessId]?.sourceLink ? (
-                  <a href={witnessMeta[row.witnessId]?.sourceLink ?? "#"} target="_blank" rel="noreferrer" className="small">
-                    Open scanned source link
-                  </a>
-                ) : null}
-                <div className="small" dir="rtl">{row.textNormalized}</div>
-                <WitnessDiff ops={row.artifacts?.tokenDiffOps ?? []} replaceDetails={row.artifacts?.replaceDetails} />
-                <div className="small">{row.artifacts?.regionId ? `Region: ${row.artifacts.regionId}` : "No scanned region linked yet."}</div>
-              </details>
-            ))}
-          </section>
         </div>
 
         <div className="right-panel-footer">

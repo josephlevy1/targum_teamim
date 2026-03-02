@@ -1449,3 +1449,9 @@ hr {
   border-radius: 8px;
   background: #fff;
 }
+
+.center-sources {
+  margin-top: 1rem;
+  border-top: 1px solid #d8d1c6;
+  padding-top: 0.75rem;
+}
