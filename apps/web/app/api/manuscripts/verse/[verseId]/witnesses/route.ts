@@ -1,20 +1,37 @@
 import { NextResponse } from "next/server";
+import { MANUSCRIPT_NORMALIZATION_FORM } from "@targum/core";
 import { getRepository } from "@/lib/repository";
+import { enrichWitnessArtifacts, sortWitnessRows } from "@/lib/manuscripts-witness-payload";
 
-const cache = new Map<string, { ts: number; payload: unknown }>();
-const CACHE_TTL_MS = 3_000;
+function normalizeComparisonText(text: string): string {
+  return text
+    .normalize(MANUSCRIPT_NORMALIZATION_FORM)
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function renderAramaicFromVerseId(verseId: string): string {
+  const repo = getRepository();
+  const record = repo.getVerseRecord(verseId as any);
+  if (!record) return "";
+  return record.verse.aramaicTokens
+    .map((token) => token.letters.map((letter) => `${letter.baseChar}${letter.niqqud.join("")}`).join(""))
+    .join(" ");
+}
 
 export async function GET(_: Request, ctx: { params: Promise<{ verseId: string }> }) {
   const { verseId } = await ctx.params;
-  const now = Date.now();
-  const cached = cache.get(verseId);
-  if (cached && now - cached.ts < CACHE_TTL_MS) {
-    return NextResponse.json(cached.payload);
-  }
   const repo = getRepository();
-  const witnesses = repo.listWitnessVersesForVerse(verseId);
+  const witnesses = enrichWitnessArtifacts(sortWitnessRows(repo.listWitnessVersesForVerse(verseId)));
   const working = repo.getWorkingVerseText(verseId);
-  const payload = { verseId, witnesses, working };
-  cache.set(verseId, { ts: now, payload });
-  return NextResponse.json(payload);
+  const baselineSurface = renderAramaicFromVerseId(verseId);
+  return NextResponse.json({
+    verseId,
+    baseline: {
+      textSurface: baselineSurface,
+      textNormalized: normalizeComparisonText(baselineSurface),
+    },
+    witnesses,
+    working,
+  });
 }

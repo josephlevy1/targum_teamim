@@ -4,6 +4,7 @@ import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { compareVerseIdsCanonical } from "@targum/core";
 import { AuthControls } from "@/components/auth-controls";
+import { WitnessDiff, type ReplaceDetail } from "@/components/witness-diff";
 import { bookRange, chapterRange, sanitizeFileNamePart, verseRange, type ExportRange } from "@/lib/export-ranges";
 
 type Tier = "DISJUNCTIVE" | "CONJUNCTIVE" | "METEG_LIKE" | "PISUQ";
@@ -38,6 +39,42 @@ type VerseRecord = {
     sourceWitnessId?: string | null;
   }>;
   state: { verified: boolean; flagged: boolean; manuscriptNotes: string; patchCursor: number };
+};
+
+type SourceWitness = {
+  witnessId: string;
+  sourceConfidence: number;
+  clarityScore: number;
+  matchScore: number;
+  completenessScore: number;
+  status: string;
+  textNormalized: string;
+  artifacts: {
+    regionId?: string;
+    tokenDiffOps?: Array<{ op: "equal" | "replace" | "insert" | "delete"; a?: string; b?: string }>;
+    replaceDetails?: Record<number, ReplaceDetail>;
+  };
+};
+
+type WitnessMeta = {
+  id: string;
+  name: string;
+  sourcePriority: number | null;
+  sourceLink: string | null;
+  sourceFileName: string | null;
+};
+
+type SourcePayload = {
+  verseId: string;
+  baseline: { textSurface: string; textNormalized: string };
+  working: {
+    selectedSource: string;
+    selectedTextSurface: string;
+    selectedTextNormalized: string;
+    ensembleConfidence: number;
+    flags: string[];
+  } | null;
+  witnesses: SourceWitness[];
 };
 
 type ParsedVerseRef = {
@@ -184,6 +221,8 @@ function HomePageInner() {
   const [exportMessage, setExportMessage] = useState("");
   const [exportOpen, setExportOpen] = useState(modeParam === "export");
   const [exportActiveAction, setExportActiveAction] = useState<"verse" | "chapter" | "book" | "all" | null>(null);
+  const [sourcePayload, setSourcePayload] = useState<SourcePayload | null>(null);
+  const [witnessMeta, setWitnessMeta] = useState<Record<string, WitnessMeta>>({});
 
   const selectedTaam = useMemo(() => record?.edited.find((t) => t.taamId === selectedTaamId) ?? null, [record, selectedTaamId]);
   const queryVerseId = searchParams.get("verseId")?.trim() ?? "";
@@ -584,6 +623,21 @@ function HomePageInner() {
     setNotes(json.state.manuscriptNotes ?? "");
   }
 
+  async function loadSources(id: string) {
+    const [sourcesRes, witnessRes] = await Promise.all([
+      fetch(`/api/manuscripts/verse/${encodeURIComponent(id)}/witnesses`),
+      fetch("/api/manuscripts/witnesses"),
+    ]);
+    if (!sourcesRes.ok) return;
+    const json = (await sourcesRes.json()) as SourcePayload;
+    if (witnessRes.ok) {
+      const witnessPayload = (await witnessRes.json()) as { witnesses?: WitnessMeta[] };
+      const map = Object.fromEntries((witnessPayload.witnesses ?? []).map((row) => [row.id, row]));
+      setWitnessMeta(map);
+    }
+    setSourcePayload(json);
+  }
+
   async function postWrite(path: string, payload?: unknown): Promise<void> {
     setUiMessage(null);
     const response = await fetch(path, {
@@ -875,6 +929,7 @@ function HomePageInner() {
   useEffect(() => {
     if (verseId) {
       void loadVerse(verseId);
+      void loadSources(verseId);
     }
   }, [verseId]);
 
@@ -1154,6 +1209,37 @@ function HomePageInner() {
             Next verse <span className="kbd-hint">N</span>
           </button>
         </div>
+
+        <section className="center-sources">
+          <div className="right-section-label">Sources</div>
+          <h3 className="section-title">Witness Sources</h3>
+          <div className="small">
+            Working source: {sourcePayload?.working?.selectedSource ?? "baseline_digital"} ({(sourcePayload?.working?.ensembleConfidence ?? 0).toFixed(2)})
+          </div>
+          <div className="small source-baseline-text" dir="rtl">
+            Baseline: {sourcePayload?.baseline?.textSurface ?? ""}
+          </div>
+          {(sourcePayload?.witnesses ?? []).map((row) => (
+            <details key={`source-${row.witnessId}`} className="source-card">
+              <summary className="small source-card-summary">
+                <strong>{row.witnessId}</strong> conf {(row.sourceConfidence * 100).toFixed(0)}% match {(row.matchScore * 100).toFixed(0)}%{" "}
+                <span className={`source-status source-status-${row.status}`}>{row.status}</span>
+              </summary>
+              <div className="small">
+                {witnessMeta[row.witnessId]?.name ?? row.witnessId}
+                {witnessMeta[row.witnessId]?.sourcePriority ? ` (P${witnessMeta[row.witnessId]?.sourcePriority})` : ""}
+              </div>
+              {witnessMeta[row.witnessId]?.sourceLink ? (
+                <a href={witnessMeta[row.witnessId]?.sourceLink ?? "#"} target="_blank" rel="noreferrer" className="small">
+                  Open scanned source link
+                </a>
+              ) : null}
+              <div className="small" dir="rtl">{row.textNormalized}</div>
+              <WitnessDiff ops={row.artifacts?.tokenDiffOps ?? []} replaceDetails={row.artifacts?.replaceDetails} />
+              <div className="small">{row.artifacts?.regionId ? `Region: ${row.artifacts.regionId}` : "No scanned region linked yet."}</div>
+            </details>
+          ))}
+        </section>
       </section>
 
       <section className="panel right-panel">
@@ -1269,6 +1355,7 @@ function HomePageInner() {
                 ))}
             </details>
           </section>
+
         </div>
 
         <div className="right-panel-footer">
