@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { alignWitnessToBaseline, recomputeCascadeForVerse, recomputeSourceConfidence } from "./manuscripts-pipeline";
+import { importHebrewLines, importTargumLines } from "./import";
 import { getRepository } from "./repository";
+
+function seedTestVerse(verseId: `${string}:${number}:${number}`): void {
+  importHebrewLines([{ verseId, text: "בְּרֵאשִׁית" }]);
+  importTargumLines([{ verseId, text: "בקדמין" }]);
+}
 
 describe("manuscripts pipeline alignment", () => {
   it("computes token and char alignment with replace details", () => {
@@ -29,8 +35,8 @@ describe("manuscripts pipeline alignment", () => {
 
   it("recomputeSourceConfidence preserves existing artifacts", () => {
     const repo = getRepository();
-    const verseId = repo.listVerseIds()[0] as string;
-    expect(verseId).toBeTruthy();
+    const verseId = "Test:1:1";
+    seedTestVerse(verseId);
     const witnessId = "test_artifact_preserve";
     repo.upsertWitness({
       id: witnessId,
@@ -61,8 +67,8 @@ describe("manuscripts pipeline alignment", () => {
 
   it("flags disagreement when top witnesses diverge by char match", () => {
     const repo = getRepository();
-    const verseId = (repo.listVerseIds()[1] ?? repo.listVerseIds()[0]) as string;
-    expect(verseId).toBeTruthy();
+    const verseId = "Test:1:2";
+    seedTestVerse(verseId);
     const witnessA = "test_top_a";
     const witnessB = "test_top_b";
     repo.upsertWitness({ id: witnessA, name: "Top A", type: "scanned_images", authorityWeight: 0.9 });
