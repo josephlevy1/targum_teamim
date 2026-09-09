@@ -16,13 +16,21 @@ fi
 mkdir -p logs
 
 # 3. Build packages + web app
+# Next serves both the server bundle and static client chunks from .next.  Do not
+# overwrite that directory while an older process is running, or its HTML can
+# reference chunks that no longer exist.
+if pm2 describe targum-web >/dev/null 2>&1; then
+  echo "[...] Stopping the existing web process before rebuilding..."
+  pm2 stop targum-web
+fi
+
 echo "[...] Building..."
 pnpm -r build
 echo "[OK]  Build complete"
 
 # 4. Start PM2
 echo "[...] Starting PM2..."
-pm2 start ecosystem.config.cjs
+pm2 startOrRestart ecosystem.config.cjs --only targum-web --update-env
 echo "[OK]  PM2 started"
 
 # 5. Load backup schedule
