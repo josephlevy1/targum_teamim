@@ -6,6 +6,8 @@ Deploy the public web application to Vercel and keep the Mac mini as a private, 
 
 Operational preference: use provider CLIs for cloud provisioning and routine management whenever they support the required action. Use the provider UI only for authorization, billing, or actions unavailable in the CLI.
 
+Cost-safety policy: remain within free-tier allowances. Configure usage alerts and enforce an application-side R2 storage cutoff at 9 GB; if projected usage would exceed that threshold, stop cloud uploads and serve an availability/error notice rather than incur an overage. Keep source files and recovery backups on the Mac mini.
+
 The current SQLite and local-file implementation cannot be deployed directly to Vercel: the deployed functions need managed database and object storage instead of `data/app.db` and the local filesystem. The worker and Vercel application communicate only through shared cloud services; Vercel never reaches into the home network.
 
 ## Target architecture
