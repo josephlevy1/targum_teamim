@@ -13,7 +13,7 @@ export function isCloudDeployment(): boolean {
 
 export function cloudRuntimeStatus() {
   return {
-    databaseConfigured: Boolean(process.env.DATABASE_URL),
+    databaseConfigured: Boolean(databaseUrl()),
     objectStorageConfigured: Boolean(
       process.env.R2_ACCOUNT_ID &&
         process.env.R2_ACCESS_KEY_ID &&
@@ -22,6 +22,11 @@ export function cloudRuntimeStatus() {
     ),
     authenticationConfigured: Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY && process.env.CLERK_SECRET_KEY),
   };
+}
+
+/** The Vercel Supabase integration provides POSTGRES_URL; DATABASE_URL is supported for local tooling. */
+export function databaseUrl(): string | null {
+  return process.env.DATABASE_URL || process.env.POSTGRES_URL || null;
 }
 
 export function r2StorageCutoffBytes(): number {
