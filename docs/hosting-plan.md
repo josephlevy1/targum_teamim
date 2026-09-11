@@ -4,6 +4,8 @@
 
 Deploy the public web application to Vercel and keep the Mac mini as a private, outbound-only worker for OCR, imports, alignment, and recovery backups. This separates low-latency public traffic from long-running, storage-heavy processing.
 
+Operational preference: use provider CLIs for cloud provisioning and routine management whenever they support the required action. Use the provider UI only for authorization, billing, or actions unavailable in the CLI.
+
 The current SQLite and local-file implementation cannot be deployed directly to Vercel: the deployed functions need managed database and object storage instead of `data/app.db` and the local filesystem. The worker and Vercel application communicate only through shared cloud services; Vercel never reaches into the home network.
 
 ## Target architecture
