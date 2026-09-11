@@ -16,6 +16,7 @@
   "dependencies": {
     "@targum/core": "workspace:*",
     "better-sqlite3": "^11.7.0",
+    "postgres": "^3.4.9",
     "zod": "^3.24.1"
   },
   "devDependencies": {
