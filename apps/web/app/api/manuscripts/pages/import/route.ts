@@ -4,6 +4,7 @@ import { getRepository } from "@/lib/repository";
 import { evaluateSourceGate, markStageCompleted, markStageFailed } from "@/lib/manuscripts-gating";
 import { analyzePageForImport } from "@/lib/manuscripts-images";
 import { getDataPaths } from "@/lib/config";
+import { isCloudDeployment } from "@/lib/cloud-runtime";
 import path from "node:path";
 
 export async function POST(request: Request) {
@@ -13,6 +14,13 @@ export async function POST(request: Request) {
     username = user.username;
   } catch (error) {
     return authErrorResponse(error) ?? NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (isCloudDeployment()) {
+    return NextResponse.json(
+      { error: "Page imports run on the private local worker, not in the Vercel runtime." },
+      { status: 409 },
+    );
   }
 
   const payload = (await request.json().catch(() => ({}))) as Record<string, unknown>;
