@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 import { applyPatchLog, parseVerseId, TORAH_BOOK_ORDER } from "@targum/core";
+import type { VerseRecord } from "@targum/storage";
+import { isCloudDeployment } from "@/lib/cloud-runtime";
+import { getPostgresReadingRepository } from "@/lib/postgres-reader";
 import { getRepository } from "@/lib/repository";
 
 type ReadingVerse = {
@@ -11,7 +14,7 @@ type ReadingVerse = {
   flagged: boolean;
 };
 
-function renderHebrewText(record: ReturnType<ReturnType<typeof getRepository>["getVerseRecord"]>): string {
+function renderHebrewText(record: VerseRecord | null): string {
   if (!record) return "";
   return record.verse.hebrewTokens
     .map((token) =>
@@ -20,7 +23,7 @@ function renderHebrewText(record: ReturnType<ReturnType<typeof getRepository>["g
     .join(" ");
 }
 
-function renderAramaicText(record: ReturnType<ReturnType<typeof getRepository>["getVerseRecord"]>): string {
+function renderAramaicText(record: VerseRecord | null): string {
   if (!record) return "";
 
   const edited = applyPatchLog(record.generated, record.patches, record.state.patchCursor);
@@ -47,8 +50,10 @@ function renderAramaicText(record: ReturnType<ReturnType<typeof getRepository>["
 }
 
 export async function GET(request: Request) {
-  const repo = getRepository();
-  const booksAndChapters = repo.listBooksAndChapters();
+  const cloud = isCloudDeployment();
+  const cloudRepo = cloud ? getPostgresReadingRepository() : null;
+  const localRepo = cloud ? null : getRepository();
+  const booksAndChapters = cloudRepo ? await cloudRepo.listBooksAndChapters() : localRepo!.listBooksAndChapters();
   if (booksAndChapters.length === 0) {
     return NextResponse.json({
       selectedBook: "",
@@ -77,7 +82,9 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Book or chapter not found." }, { status: 404 });
   }
 
-  const records = repo.getChapterRecords(selectedBook, selectedChapter);
+  const records = cloudRepo
+    ? await cloudRepo.getChapterRecords(selectedBook, selectedChapter)
+    : localRepo!.getChapterRecords(selectedBook, selectedChapter);
 
   const verses: ReadingVerse[] = records.map((record) => ({
     verseId: record.verse.id,
